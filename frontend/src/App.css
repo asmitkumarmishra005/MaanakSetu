@@ -1,0 +1,145 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f8fafc;
+  color: #172033;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+
+/* NAVBAR */
+
+.navbar {
+  height: 70px;
+  padding: 0 8%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.nav-links {
+  display: flex;
+  gap: 12px;
+}
+
+.nav-links button {
+  border: none;
+  background: transparent;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.register-btn {
+  background: #172033 !important;
+  color: white;
+  border-radius: 6px;
+}
+
+
+/* HERO */
+
+.hero {
+  padding: 100px 8%;
+  background: white;
+}
+
+.hero-content {
+  max-width: 850px;
+}
+
+.tagline {
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.hero h1 {
+  font-size: 52px;
+  line-height: 1.15;
+  margin: 20px 0;
+}
+
+.hero h1 span {
+  display: block;
+}
+
+.description {
+  max-width: 700px;
+  font-size: 18px;
+  line-height: 1.7;
+  color: #5f6b7a;
+}
+
+.hero-buttons {
+  display: flex;
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.primary-btn,
+.secondary-btn {
+  padding: 14px 22px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.primary-btn {
+  background: #172033;
+  color: white;
+  border: none;
+}
+
+.secondary-btn {
+  background: white;
+  border: 1px solid #172033;
+}
+
+
+/* FEATURES */
+
+.features {
+  padding: 70px 8%;
+}
+
+.features h2 {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.feature-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.feature-card {
+  background: white;
+  padding: 25px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.feature-card h3 {
+  margin-top: 0;
+}
+
+.feature-card p {
+  color: #667085;
+  line-height: 1.6;
+}
