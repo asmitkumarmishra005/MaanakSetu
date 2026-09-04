@@ -120,6 +120,12 @@ router.post("/login", async (req, res) => {
 
     const user = result.rows[0];
 
+    console.log("LOGIN DEBUG:", {
+  email: user.email,
+  id: user.id,
+  role: user.role,
+});
+
     if (!user.is_active) {
       return res.status(403).json({
         success: false,
