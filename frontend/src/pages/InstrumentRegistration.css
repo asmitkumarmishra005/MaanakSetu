@@ -1,0 +1,216 @@
+.instrument-page {
+  min-height: 100vh;
+
+  background:
+    radial-gradient(
+      circle at 10% 10%,
+      rgba(49, 85, 143, 0.12),
+      transparent 30%
+    ),
+    #f4f7fb;
+
+  font-family: "Inter", Arial, sans-serif;
+
+  padding: 50px 20px;
+}
+
+.instrument-container {
+  width: 90%;
+  max-width: 950px;
+  margin: auto;
+}
+
+.instrument-header {
+  margin-bottom: 25px;
+}
+
+.back-link {
+  color: #31558f;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.instrument-header h1 {
+  margin: 15px 0 8px;
+
+  font-family: Georgia, serif;
+
+  font-size: 34px;
+
+  color: #172033;
+}
+
+.instrument-header p {
+  color: #667085;
+}
+
+.instrument-card {
+  background: white;
+
+  padding: 40px;
+
+  border-radius: 18px;
+
+  box-shadow:
+    0 15px 40px rgba(20, 40, 70, 0.08);
+
+  border: 1px solid #e4e8ef;
+}
+
+.form-grid {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 22px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.field label {
+  margin-bottom: 8px;
+
+  font-size: 13px;
+
+  font-weight: 600;
+
+  color: #344054;
+}
+
+.field input,
+.field select {
+  padding: 13px 14px;
+
+  border: 1px solid #d0d5dd;
+
+  border-radius: 9px;
+
+  background: #fafbfc;
+
+  outline: none;
+
+  font-size: 14px;
+
+  transition: 0.2s;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: #31558f;
+
+  background: white;
+
+  box-shadow:
+    0 0 0 4px rgba(49, 85, 143, 0.1);
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.register-instrument-btn {
+  width: 100%;
+
+  margin-top: 30px;
+
+  padding: 14px;
+
+  border: none;
+
+  border-radius: 10px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #172033,
+      #31558f
+    );
+
+  color: white;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.25s;
+}
+
+.register-instrument-btn:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 10px 25px rgba(23, 32, 51, 0.2);
+}
+
+.success-box {
+  text-align: center;
+
+  padding: 45px 20px;
+}
+
+.success-icon {
+  width: 70px;
+  height: 70px;
+
+  margin: auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #e8f6ef;
+
+  color: #16834a;
+
+  font-size: 35px;
+}
+
+.success-box h2 {
+  margin-top: 20px;
+
+  font-family: Georgia, serif;
+}
+
+.success-box p {
+  color: #667085;
+}
+
+.dashboard-link {
+  display: inline-block;
+
+  margin-top: 15px;
+
+  padding: 12px 20px;
+
+  border-radius: 9px;
+
+  background: #31558f;
+
+  color: white;
+
+  text-decoration: none;
+
+  font-size: 13px;
+}
+
+@media (max-width: 650px) {
+
+  .instrument-card {
+    padding: 25px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .full-width {
+    grid-column: auto;
+  }
+}
