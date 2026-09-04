@@ -1,180 +1,434 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import API_URL from "../api";
 import "./Certificates.css";
 
 function Certificates() {
-  const certificates = [
-    {
-      id: "CERT-MS-2026-0001",
-      instrument: "Electronic Weighing Scale",
-      manufacturer: "Essae",
-      model: "DS-215",
-      serial: "EWS-458921",
-      issued: "05 Sep 2026",
-      validUntil: "04 Sep 2027",
-      status: "Valid",
-    },
-    {
-      id: "CERT-MS-2026-0002",
-      instrument: "Platform Scale",
-      manufacturer: "A&D",
-      model: "FG-60KAL",
-      serial: "PS-782341",
-      issued: "20 Aug 2026",
-      validUntil: "19 Aug 2027",
-      status: "Valid",
-    },
-  ];
+  const navigate = useNavigate();
+
+  const [certificates, setCertificates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    loadCertificates();
+  }, []);
+
+  const loadCertificates = async () => {
+    const token = localStorage.getItem("maanaksetu_token");
+    const savedUser = localStorage.getItem("maanaksetu_user");
+
+    if (!token || !savedUser) {
+      navigate("/login");
+      return;
+    }
+
+    let user;
+
+    try {
+      user = JSON.parse(savedUser);
+    } catch {
+      localStorage.removeItem("maanaksetu_token");
+      localStorage.removeItem("maanaksetu_user");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/certificates/user/${user.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem("maanaksetu_token");
+        localStorage.removeItem("maanaksetu_user");
+        navigate("/login");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Failed to load certificates"
+        );
+      }
+
+      setCertificates(data.certificates || []);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCertificateStatus = (certificate) => {
+    if (certificate.status === "revoked") {
+      return "Revoked";
+    }
+
+    if (!certificate.valid_until) {
+      return "Valid";
+    }
+
+    const expiryDate = new Date(
+      certificate.valid_until
+    );
+
+    if (expiryDate < new Date()) {
+      return "Expired";
+    }
+
+    return "Valid";
+  };
+
+  const getStatusClass = (status) => {
+    if (status === "Valid") {
+      return "status-valid";
+    }
+
+    if (status === "Expired") {
+      return "status-expired";
+    }
+
+    return "status-revoked";
+  };
+
+  const formatDate = (date) => {
+    if (!date) {
+      return "N/A";
+    }
+
+    return new Date(date).toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
+  };
+
+  const handleView = (certificate) => {
+    const verificationId =
+      certificate.certificate_number ||
+      certificate.id;
+
+    window.open(
+      `${window.location.origin}${window.location.pathname}#/certificates/${verificationId}`,
+      "_blank"
+    );
+  };
+
+  const handleVerify = (certificate) => {
+    const verificationId =
+      certificate.certificate_number ||
+      certificate.id;
+
+    window.open(
+      `${window.location.origin}${window.location.pathname}#/verify/${verificationId}`,
+      "_blank"
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="certificates-page">
+        <div className="certificates-container">
+          <h2>Loading Certificates...</h2>
+
+          <p>
+            Fetching your digital certificates.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="certificates-page">
-
-      {/* HEADER */}
       <header className="certificates-header">
-
         <div>
           <h1>⚖ MaanakSetu</h1>
-          <p>Digital Legal Metrology Certificates</p>
+
+          <p>
+            Digital Legal Metrology Certificates
+          </p>
         </div>
 
-        <Link to="/dashboard" className="certificates-dashboard">
-          Dashboard
+        <Link
+          to="/dashboard"
+          className="certificates-back"
+        >
+          ← Dashboard
         </Link>
-
       </header>
 
-      {/* CONTENT */}
       <main className="certificates-container">
-
-        <Link to="/dashboard" className="certificates-back">
-          ← Back to Dashboard
-        </Link>
-
-        <div className="certificates-heading">
-
+        <div className="certificates-title">
           <div>
             <h2>My Certificates</h2>
 
             <p>
-              View and manage your Legal Metrology verification
-              certificates.
+              View and verify certificates issued for
+              your instruments.
             </p>
           </div>
 
-          <div className="certificate-count">
-            <span>📜</span>
-            <strong>{certificates.length}</strong>
-            <small>Certificates</small>
-          </div>
-
+          <button
+            type="button"
+            className="refresh-btn"
+            onClick={loadCertificates}
+          >
+            ↻ Refresh
+          </button>
         </div>
 
-        {/* CERTIFICATES */}
-        <section className="certificate-list">
+        {message && (
+          <div className="certificates-message">
+            {message}
+          </div>
+        )}
 
-          {certificates.map((certificate) => (
+        <section className="certificate-summary">
+          <div className="summary-card">
+            <span>📜</span>
 
-            <div
-              className="certificate-card"
-              key={certificate.id}
-            >
+            <strong>
+              {certificates.length}
+            </strong>
 
-              <div className="certificate-top">
+            <p>Total Certificates</p>
+          </div>
 
-                <div className="certificate-icon">
-                  📜
-                </div>
+          <div className="summary-card">
+            <span>✅</span>
 
-                <div className="certificate-title">
+            <strong>
+              {
+                certificates.filter(
+                  (certificate) =>
+                    getCertificateStatus(
+                      certificate
+                    ) === "Valid"
+                ).length
+              }
+            </strong>
 
-                  <h3>
-                    {certificate.instrument}
-                  </h3>
+            <p>Valid</p>
+          </div>
 
-                  <p>
-                    Certificate No.{" "}
-                    <strong>{certificate.id}</strong>
-                  </p>
+          <div className="summary-card">
+            <span>⏰</span>
 
-                </div>
+            <strong>
+              {
+                certificates.filter(
+                  (certificate) =>
+                    getCertificateStatus(
+                      certificate
+                    ) === "Expired"
+                ).length
+              }
+            </strong>
 
-                <span className="certificate-status">
-                  ✓ {certificate.status}
-                </span>
+            <p>Expired</p>
+          </div>
 
-              </div>
+          <div className="summary-card">
+            <span>🚫</span>
 
-              <div className="certificate-details">
+            <strong>
+              {
+                certificates.filter(
+                  (certificate) =>
+                    getCertificateStatus(
+                      certificate
+                    ) === "Revoked"
+                ).length
+              }
+            </strong>
 
-                <div>
-                  <span>Manufacturer</span>
-                  <strong>{certificate.manufacturer}</strong>
-                </div>
+            <p>Revoked</p>
+          </div>
+        </section>
 
-                <div>
-                  <span>Model Number</span>
-                  <strong>{certificate.model}</strong>
-                </div>
+        <section className="certificates-list-section">
+          <div className="section-heading">
+            <div>
+              <h2>Certificate Records</h2>
 
-                <div>
-                  <span>Serial Number</span>
-                  <strong>{certificate.serial}</strong>
-                </div>
-
-                <div>
-                  <span>Issued On</span>
-                  <strong>{certificate.issued}</strong>
-                </div>
-
-                <div>
-                  <span>Valid Until</span>
-                  <strong>{certificate.validUntil}</strong>
-                </div>
-
-              </div>
-
-              <div className="certificate-actions">
-
-                <button className="view-certificate-btn">
-                  View Certificate
-                </button>
-
-                <button className="download-certificate-btn">
-                  ↓ Download PDF
-                </button>
-
-                <button className="verify-certificate-btn">
-                  🔲 Verify
-                </button>
-
-              </div>
-
+              <p>
+                Digitally issued verification
+                certificates associated with your
+                account.
+              </p>
             </div>
-
-          ))}
-
-        </section>
-
-        {/* EMPTY / INFORMATION AREA */}
-        <section className="certificate-info">
-
-          <div className="info-icon">
-            🔐
           </div>
 
-          <div>
-            <h3>Secure Digital Certificates</h3>
+          {certificates.length === 0 ? (
+            <div className="empty-certificates">
+              <div>📜</div>
 
-            <p>
-              Every MaanakSetu certificate contains a unique
-              certificate number and QR verification mechanism
-              to help verify its authenticity.
-            </p>
-          </div>
+              <h3>No Certificates Yet</h3>
 
+              <p>
+                A certificate will appear here after
+                an authorized officer completes a
+                successful verification.
+              </p>
+
+              <Link
+                to="/applications"
+                className="view-applications-btn"
+              >
+                View Applications →
+              </Link>
+            </div>
+          ) : (
+            <div className="certificate-grid">
+              {certificates.map(
+                (certificate) => {
+                  const status =
+                    getCertificateStatus(
+                      certificate
+                    );
+
+                  return (
+                    <article
+                      className="certificate-card"
+                      key={certificate.id}
+                    >
+                      <div className="certificate-card-top">
+                        <div className="certificate-icon">
+                          📜
+                        </div>
+
+                        <span
+                          className={`status-badge ${getStatusClass(
+                            status
+                          )}`}
+                        >
+                          {status}
+                        </span>
+                      </div>
+
+                      <div className="certificate-number">
+                        <span>
+                          Certificate Number
+                        </span>
+
+                        <strong>
+                          {
+                            certificate.certificate_number
+                          }
+                        </strong>
+                      </div>
+
+                      <div className="certificate-details">
+                        <div>
+                          <span>Instrument</span>
+
+                          <strong>
+                            {
+                              certificate.instrument_type ||
+                              "Instrument"
+                            }
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>Manufacturer</span>
+
+                          <strong>
+                            {
+                              certificate.manufacturer ||
+                              "N/A"
+                            }
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>Model</span>
+
+                          <strong>
+                            {
+                              certificate.model ||
+                              "N/A"
+                            }
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>Serial Number</span>
+
+                          <strong>
+                            {
+                              certificate.serial_number ||
+                              "N/A"
+                            }
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>Issued On</span>
+
+                          <strong>
+                            {formatDate(
+                              certificate.issued_at ||
+                                certificate.issued_on
+                            )}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>Valid Until</span>
+
+                          <strong>
+                            {formatDate(
+                              certificate.valid_until
+                            )}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="certificate-actions">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleView(
+                              certificate
+                            )
+                          }
+                        >
+                          👁 View
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleVerify(
+                              certificate
+                            )
+                          }
+                        >
+                          🔍 Verify
+                        </button>
+                      </div>
+                    </article>
+                  );
+                }
+              )}
+            </div>
+          )}
         </section>
-
       </main>
-
     </div>
   );
 }

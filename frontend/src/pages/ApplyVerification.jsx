@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import API_URL from "../api";
 import "./ApplyVerification.css";
 
 function ApplyVerification() {
   const navigate = useNavigate();
 
   const [instruments, setInstruments] = useState([]);
+
   const [formData, setFormData] = useState({
     instrumentId: "",
     verificationType: "periodic",
@@ -31,11 +33,20 @@ function ApplyVerification() {
       return;
     }
 
-    const user = JSON.parse(savedUser);
+    let user;
+
+    try {
+      user = JSON.parse(savedUser);
+    } catch {
+      localStorage.removeItem("maanaksetu_token");
+      localStorage.removeItem("maanaksetu_user");
+      navigate("/login");
+      return;
+    }
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/instruments/user/${user.id}`,
+        `${API_URL}/instruments/user/${user.id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -44,6 +55,13 @@ function ApplyVerification() {
       );
 
       const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem("maanaksetu_token");
+        localStorage.removeItem("maanaksetu_user");
+        navigate("/login");
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -77,14 +95,23 @@ function ApplyVerification() {
       return;
     }
 
-    const user = JSON.parse(savedUser);
+    let user;
+
+    try {
+      user = JSON.parse(savedUser);
+    } catch {
+      localStorage.removeItem("maanaksetu_token");
+      localStorage.removeItem("maanaksetu_user");
+      navigate("/login");
+      return;
+    }
 
     setSubmitting(true);
     setMessage("");
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/applications",
+        `${API_URL}/applications`,
         {
           method: "POST",
           headers: {
@@ -104,9 +131,17 @@ function ApplyVerification() {
 
       const data = await response.json();
 
+      if (response.status === 401) {
+        localStorage.removeItem("maanaksetu_token");
+        localStorage.removeItem("maanaksetu_user");
+        navigate("/login");
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(
-          data.message || "Application submission failed"
+          data.message ||
+            "Application submission failed"
         );
       }
 
@@ -143,7 +178,10 @@ function ApplyVerification() {
     <div className="apply-page">
       <div className="apply-card">
         <div className="apply-header">
-          <Link to="/dashboard" className="back-link">
+          <Link
+            to="/dashboard"
+            className="back-link"
+          >
             ← Back to Dashboard
           </Link>
 
@@ -227,7 +265,9 @@ function ApplyVerification() {
             </div>
 
             <div className="form-group">
-              <label>Preferred Verification Date</label>
+              <label>
+                Preferred Verification Date
+              </label>
 
               <input
                 type="date"
@@ -274,16 +314,14 @@ function ApplyVerification() {
                   marginTop: "15px",
                   padding: "12px",
                   borderRadius: "8px",
-                  background: message.includes(
-                    "successfully"
-                  )
-                    ? "#e8f7ee"
-                    : "#fdecec",
-                  color: message.includes(
-                    "successfully"
-                  )
-                    ? "#16733c"
-                    : "#b42318",
+                  background:
+                    message.includes("successfully")
+                      ? "#e8f7ee"
+                      : "#fdecec",
+                  color:
+                    message.includes("successfully")
+                      ? "#16733c"
+                      : "#b42318",
                 }}
               >
                 {message}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import API_URL from "../api";
 import "./InstrumentRegistration.css";
 
 function InstrumentRegistration() {
@@ -36,14 +37,23 @@ function InstrumentRegistration() {
       return;
     }
 
-    const user = JSON.parse(savedUser);
+    let user;
+
+    try {
+      user = JSON.parse(savedUser);
+    } catch {
+      localStorage.removeItem("maanaksetu_token");
+      localStorage.removeItem("maanaksetu_user");
+      navigate("/login");
+      return;
+    }
 
     setLoading(true);
     setMessage("");
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/instruments",
+        `${API_URL}/instruments`,
         {
           method: "POST",
           headers: {
@@ -57,7 +67,8 @@ function InstrumentRegistration() {
             model: formData.model,
             serialNumber: formData.serialNumber,
             capacity: formData.capacity,
-            yearOfManufacture: formData.yearOfManufacture,
+            yearOfManufacture:
+              formData.yearOfManufacture,
             location: formData.location,
           }),
         }
@@ -65,13 +76,23 @@ function InstrumentRegistration() {
 
       const data = await response.json();
 
+      if (response.status === 401) {
+        localStorage.removeItem("maanaksetu_token");
+        localStorage.removeItem("maanaksetu_user");
+        navigate("/login");
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(
-          data.message || "Instrument registration failed"
+          data.message ||
+            "Instrument registration failed"
         );
       }
 
-      setMessage("Instrument registered successfully! 🎉");
+      setMessage(
+        "Instrument registered successfully! 🎉"
+      );
 
       setTimeout(() => {
         navigate("/dashboard");
@@ -87,17 +108,22 @@ function InstrumentRegistration() {
     <div className="instrument-page">
       <div className="instrument-card">
         <div className="instrument-header">
-          <Link to="/dashboard" className="back-link">
+          <Link
+            to="/dashboard"
+            className="back-link"
+          >
             ← Back to Dashboard
           </Link>
 
-          <div className="instrument-icon">⚖️</div>
+          <div className="instrument-icon">
+            ⚖️
+          </div>
 
           <h1>Register Instrument</h1>
 
           <p>
-            Register your weighing or measuring instrument
-            with MaanakSetu.
+            Register your weighing or measuring
+            instrument with MaanakSetu.
           </p>
         </div>
 
@@ -118,21 +144,27 @@ function InstrumentRegistration() {
                 <option value="">
                   Select instrument type
                 </option>
+
                 <option value="Electronic Weighing Scale">
                   Electronic Weighing Scale
                 </option>
+
                 <option value="Platform Scale">
                   Platform Scale
                 </option>
+
                 <option value="Electronic Balance">
                   Electronic Balance
                 </option>
+
                 <option value="Retail Weighing Scale">
                   Retail Weighing Scale
                 </option>
+
                 <option value="Measuring Instrument">
                   Measuring Instrument
                 </option>
+
                 <option value="Other">
                   Other
                 </option>
@@ -226,12 +258,14 @@ function InstrumentRegistration() {
                 marginTop: "15px",
                 padding: "12px",
                 borderRadius: "8px",
-                background: message.includes("successfully")
-                  ? "#e8f7ee"
-                  : "#fdecec",
-                color: message.includes("successfully")
-                  ? "#16733c"
-                  : "#b42318",
+                background:
+                  message.includes("successfully")
+                    ? "#e8f7ee"
+                    : "#fdecec",
+                color:
+                  message.includes("successfully")
+                    ? "#16733c"
+                    : "#b42318",
               }}
             >
               {message}

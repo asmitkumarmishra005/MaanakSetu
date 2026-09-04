@@ -1,238 +1,326 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import API_URL from "../api";
 import "./OfficerDashboard.css";
 
 function OfficerDashboard() {
-  const applications = [
-    {
-      id: "MS-2026-0001",
-      applicant: "Rajesh Kumar",
-      instrument: "Electronic Weighing Scale",
-      serial: "EWS-458921",
-      location: "Kolkata, West Bengal",
-      submitted: "02 Sep 2026",
-      status: "Pending Inspection",
-    },
-    {
-      id: "MS-2026-0002",
-      applicant: "Sharma Traders",
-      instrument: "Platform Scale",
-      serial: "PS-782341",
-      location: "Howrah, West Bengal",
-      submitted: "01 Sep 2026",
-      status: "Pending Inspection",
-    },
-    {
-      id: "MS-2026-0003",
-      applicant: "Amit Enterprises",
-      instrument: "Electronic Balance",
-      serial: "EB-391284",
-      location: "Salt Lake, Kolkata",
-      submitted: "30 Aug 2026",
-      status: "Inspection Completed",
-    },
-  ];
+  const navigate = useNavigate();
+
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    loadApplications();
+  }, []);
+
+  const loadApplications = async () => {
+    const token = localStorage.getItem("maanaksetu_token");
+    const savedUser = localStorage.getItem("maanaksetu_user");
+
+    if (!token || !savedUser) {
+      navigate("/login");
+      return;
+    }
+
+    let user;
+
+    try {
+      user = JSON.parse(savedUser);
+    } catch {
+      localStorage.removeItem("maanaksetu_token");
+      localStorage.removeItem("maanaksetu_user");
+      navigate("/login");
+      return;
+    }
+
+    if (
+      user.role !== "officer" &&
+      user.role !== "admin" &&
+      user.role !== "gatc"
+    ) {
+      setMessage(
+        "Access denied. Officer privileges are required."
+      );
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/applications`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem("maanaksetu_token");
+        localStorage.removeItem("maanaksetu_user");
+        navigate("/login");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Failed to load applications"
+        );
+      }
+
+      setApplications(data.applications || []);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalApplications = applications.length;
+
+  const pendingApplications = applications.filter(
+    (application) =>
+      application.status === "pending" ||
+      application.status === "under_review" ||
+      application.status === "assigned" ||
+      application.status === "pending_inspection"
+  ).length;
+
+  const completedApplications = applications.filter(
+    (application) =>
+      application.status ===
+      "inspection_completed"
+  ).length;
+
+  const verifiedApplications = applications.filter(
+    (application) =>
+      application.status === "verified"
+  ).length;
+
+  const handleLogout = () => {
+    localStorage.removeItem("maanaksetu_token");
+    localStorage.removeItem("maanaksetu_user");
+
+    navigate("/login");
+  };
+
+  if (loading) {
+    return (
+      <div className="officer-page">
+        <div className="officer-container">
+          <h2>Loading Officer Dashboard...</h2>
+          <p>Fetching verification applications.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="officer-page">
-
-      {/* HEADER */}
       <header className="officer-header">
-
         <div>
           <h1>⚖ MaanakSetu</h1>
-
-          <p>
-            Legal Metrology Officer Portal
-          </p>
+          <p>Officer Verification Portal</p>
         </div>
 
-        <div className="officer-profile">
-          <div className="officer-avatar">
-            👨‍💼
-          </div>
-
-          <div>
-            <strong>Officer</strong>
-            <span>LMO Department</span>
-          </div>
-
-          <Link to="/" className="officer-logout">
-            Logout
+        <div className="officer-header-actions">
+          <Link
+            to="/inspection"
+            className="inspection-link"
+          >
+            🔍 Inspection Portal
           </Link>
-        </div>
 
+          <button
+            className="officer-logout"
+            onClick={handleLogout}
+          >
+            Logout
+          </button>
+        </div>
       </header>
 
-      {/* CONTENT */}
-      <main className="officer-content">
-
-        <div className="officer-welcome">
-
+      <main className="officer-container">
+        <section className="officer-welcome">
           <div>
-            <Link to="/" className="officer-back">
-              ← Home
-            </Link>
-
             <h2>Officer Dashboard</h2>
-
             <p>
-              Manage assigned verification applications,
-              inspections and certification decisions.
+              Review applications and complete official
+              instrument inspections.
             </p>
           </div>
 
-        </div>
+          <Link
+            to="/inspection"
+            className="start-inspection-btn"
+          >
+            Start Inspection →
+          </Link>
+        </section>
 
-        {/* STATS */}
+        {message && (
+          <div className="officer-message">
+            {message}
+          </div>
+        )}
+
         <section className="officer-stats">
-
-          <div className="officer-stat">
+          <div className="officer-stat-card">
             <span>📋</span>
-            <strong>12</strong>
-            <p>Assigned Applications</p>
+            <strong>{totalApplications}</strong>
+            <p>Total Applications</p>
           </div>
 
-          <div className="officer-stat">
+          <div className="officer-stat-card">
             <span>⏳</span>
-            <strong>5</strong>
+            <strong>{pendingApplications}</strong>
             <p>Pending Inspection</p>
           </div>
 
-          <div className="officer-stat">
+          <div className="officer-stat-card">
             <span>🔍</span>
-            <strong>4</strong>
-            <p>Inspections Completed</p>
+            <strong>{completedApplications}</strong>
+            <p>Inspection Completed</p>
           </div>
 
-          <div className="officer-stat">
-            <span>📜</span>
-            <strong>3</strong>
-            <p>Certificates Issued</p>
+          <div className="officer-stat-card">
+            <span>✅</span>
+            <strong>{verifiedApplications}</strong>
+            <p>Verified</p>
           </div>
-
         </section>
 
-        {/* APPLICATIONS */}
         <section className="officer-applications">
-
-          <div className="officer-section-heading">
-
+          <div className="section-heading">
             <div>
-              <h2>Assigned Applications</h2>
-
+              <h2>Verification Applications</h2>
               <p>
-                Applications requiring officer action
+                Applications available for officer
+                inspection.
               </p>
             </div>
 
-            <button>
-              Filter
+            <button
+              type="button"
+              className="refresh-btn"
+              onClick={loadApplications}
+            >
+              ↻ Refresh
             </button>
-
           </div>
 
-          <div className="officer-table">
-
-            <div className="officer-table-header">
-
-              <span>Application</span>
-              <span>Instrument</span>
-              <span>Location</span>
-              <span>Status</span>
-              <span>Action</span>
-
+          {applications.length === 0 ? (
+            <div className="empty-officer">
+              <div>📋</div>
+              <h3>No Applications Found</h3>
+              <p>
+                New verification applications will
+                appear here.
+              </p>
             </div>
+          ) : (
+            <div className="officer-table-wrapper">
+              <table className="officer-table">
+                <thead>
+                  <tr>
+                    <th>Application</th>
+                    <th>Applicant</th>
+                    <th>Instrument</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
 
-            {applications.map((application) => (
+                <tbody>
+                  {applications.map(
+                    (application) => (
+                      <tr key={application.id}>
+                        <td>
+                          <strong>
+                            {
+                              application.application_number
+                            }
+                          </strong>
+                        </td>
 
-              <div
-                className="officer-table-row"
-                key={application.id}
-              >
+                        <td>
+                          {application.full_name ||
+                            application.user_name ||
+                            "Applicant"}
+                        </td>
 
-                <div className="officer-application-id">
+                        <td>
+                          <strong>
+                            {
+                              application.instrument_type
+                            }
+                          </strong>
 
-                  <strong>
-                    {application.id}
-                  </strong>
+                          <small>
+                            {application.serial_number ||
+                              "Serial N/A"}
+                          </small>
+                        </td>
 
-                  <small>
-                    {application.applicant}
-                  </small>
+                        <td>
+                          {application.location ||
+                            "Not specified"}
+                        </td>
 
-                </div>
+                        <td>
+                          <span
+                            className={`status-badge status-${(
+                              application.status ||
+                              "pending"
+                            ).replace(
+                              /_/g,
+                              "-"
+                            )}`}
+                          >
+                            {(
+                              application.status ||
+                              "pending"
+                            ).replace(
+                              /_/g,
+                              " "
+                            )}
+                          </span>
+                        </td>
 
-                <div>
-
-                  <strong>
-                    {application.instrument}
-                  </strong>
-
-                  <small>
-                    Serial: {application.serial}
-                  </small>
-
-                </div>
-
-                <div>
-
-                  <span>
-                    {application.location}
-                  </span>
-
-                  <small>
-                    Submitted: {application.submitted}
-                  </small>
-
-                </div>
-
-                <div>
-
-                  <span
-                    className={
-                      application.status ===
-                      "Inspection Completed"
-                        ? "officer-status completed"
-                        : "officer-status pending"
-                    }
-                  >
-                    {application.status}
-                  </span>
-
-                </div>
-
-                <div>
-
-                  {application.status ===
-                  "Inspection Completed" ? (
-
-                    <button className="view-btn">
-                      View Report
-                    </button>
-
-                  ) : (
-
-                    <Link
-                      to="/inspection"
-                      className="inspect-btn"
-                    >
-                      Start Inspection →
-                    </Link>
-
+                        <td>
+                          {application.status ===
+                          "inspection_completed" ? (
+                            <span className="completed-label">
+                              ✓ Completed
+                            </span>
+                          ) : application.status ===
+                            "verified" ? (
+                            <span className="completed-label">
+                              ✓ Verified
+                            </span>
+                          ) : (
+                            <Link
+                              to="/inspection"
+                              className="inspect-btn"
+                            >
+                              Inspect →
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    )
                   )}
-
-                </div>
-
-              </div>
-
-            ))}
-
-          </div>
-
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
-
       </main>
-
     </div>
   );
 }

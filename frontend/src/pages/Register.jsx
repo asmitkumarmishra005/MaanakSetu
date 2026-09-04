@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import API_URL from "../api";
 import "./Register.css";
 
 function Register() {
@@ -31,7 +32,7 @@ function Register() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/auth/register",
+        `${API_URL}/auth/register`,
         {
           method: "POST",
           headers: {
@@ -49,7 +50,11 @@ function Register() {
         );
       }
 
-      localStorage.setItem("maanaksetu_token", data.token);
+      localStorage.setItem(
+        "maanaksetu_token",
+        data.token
+      );
+
       localStorage.setItem(
         "maanaksetu_user",
         JSON.stringify(data.user)
@@ -58,7 +63,11 @@ function Register() {
       setMessage("Account created successfully! 🎉");
 
       setTimeout(() => {
-        navigate("/dashboard");
+        if (data.user.role === "officer") {
+          navigate("/officer-dashboard");
+        } else {
+          navigate("/dashboard");
+        }
       }, 800);
     } catch (error) {
       setMessage(error.message);
