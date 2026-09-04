@@ -15,6 +15,9 @@ function OfficerDashboard() {
   }, []);
 
   const loadApplications = async () => {
+    setLoading(true);
+    setMessage("");
+
     const token = localStorage.getItem("maanaksetu_token");
     const savedUser = localStorage.getItem("maanaksetu_user");
 
@@ -50,8 +53,10 @@ function OfficerDashboard() {
       const response = await fetch(
         `${API_URL}/applications`,
         {
+          method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
         }
       );
@@ -67,14 +72,23 @@ function OfficerDashboard() {
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            "Failed to load applications"
+          data.message || "Failed to load applications"
         );
       }
 
-      setApplications(data.applications || []);
+      if (!Array.isArray(data.applications)) {
+        throw new Error(
+          "Invalid applications data received from server"
+        );
+      }
+
+      setApplications(data.applications);
     } catch (error) {
-      setMessage(error.message);
+      console.error("Officer dashboard error:", error);
+      setMessage(
+        error.message ||
+          "Unable to load verification applications."
+      );
     } finally {
       setLoading(false);
     }
@@ -84,16 +98,17 @@ function OfficerDashboard() {
 
   const pendingApplications = applications.filter(
     (application) =>
+      application.status === "submitted" ||
       application.status === "pending" ||
       application.status === "under_review" ||
       application.status === "assigned" ||
+      application.status === "inspection_scheduled" ||
       application.status === "pending_inspection"
   ).length;
 
   const completedApplications = applications.filter(
     (application) =>
-      application.status ===
-      "inspection_completed"
+      application.status === "inspection_completed"
   ).length;
 
   const verifiedApplications = applications.filter(
@@ -108,12 +123,22 @@ function OfficerDashboard() {
     navigate("/login");
   };
 
+  const formatStatus = (status) => {
+    if (!status) {
+      return "pending";
+    }
+
+    return status.replace(/_/g, " ");
+  };
+
   if (loading) {
     return (
       <div className="officer-page">
         <div className="officer-container">
           <h2>Loading Officer Dashboard...</h2>
-          <p>Fetching verification applications.</p>
+          <p>
+            Fetching verification applications.
+          </p>
         </div>
       </div>
     );
@@ -148,6 +173,7 @@ function OfficerDashboard() {
         <section className="officer-welcome">
           <div>
             <h2>Officer Dashboard</h2>
+
             <p>
               Review applications and complete official
               instrument inspections.
@@ -198,6 +224,7 @@ function OfficerDashboard() {
           <div className="section-heading">
             <div>
               <h2>Verification Applications</h2>
+
               <p>
                 Applications available for officer
                 inspection.
@@ -216,10 +243,17 @@ function OfficerDashboard() {
           {applications.length === 0 ? (
             <div className="empty-officer">
               <div>📋</div>
+
               <h3>No Applications Found</h3>
+
               <p>
-                New verification applications will
-                appear here.
+                No verification applications have been
+                submitted yet.
+              </p>
+
+              <p>
+                Submit an application from a Business/User
+                account first.
               </p>
             </div>
           ) : (
@@ -237,84 +271,91 @@ function OfficerDashboard() {
                 </thead>
 
                 <tbody>
-                  {applications.map(
-                    (application) => (
-                      <tr key={application.id}>
-                        <td>
-                          <strong>
-                            {
-                              application.application_number
-                            }
-                          </strong>
-                        </td>
+                  {applications.map((application) => (
+                    <tr key={application.id}>
+                      <td>
+                        <strong>
+                          {application.application_number ||
+                            "Application N/A"}
+                        </strong>
 
-                        <td>
-                          {application.full_name ||
-                            application.user_name ||
+                        <small>
+                          {application.verification_type ||
+                            "Verification"}
+                        </small>
+                      </td>
+
+                      <td>
+                        <strong>
+                          {application.applicant_name ||
                             "Applicant"}
-                        </td>
+                        </strong>
 
-                        <td>
-                          <strong>
-                            {
-                              application.instrument_type
-                            }
-                          </strong>
+                        <small>
+                          {application.applicant_email ||
+                            "Email N/A"}
+                        </small>
+                      </td>
 
-                          <small>
-                            {application.serial_number ||
-                              "Serial N/A"}
-                          </small>
-                        </td>
+                      <td>
+                        <strong>
+                          {application.instrument_type ||
+                            "Instrument N/A"}
+                        </strong>
 
-                        <td>
-                          {application.location ||
-                            "Not specified"}
-                        </td>
+                        <small>
+                          {application.manufacturer ||
+                            "Manufacturer N/A"}
+                        </small>
 
-                        <td>
-                          <span
-                            className={`status-badge status-${(
-                              application.status ||
-                              "pending"
-                            ).replace(
-                              /_/g,
-                              "-"
-                            )}`}
-                          >
-                            {(
-                              application.status ||
-                              "pending"
-                            ).replace(
-                              /_/g,
-                              " "
-                            )}
-                          </span>
-                        </td>
+                        <small>
+                          Serial:{" "}
+                          {application.serial_number ||
+                            "N/A"}
+                        </small>
+                      </td>
 
-                        <td>
-                          {application.status ===
-                          "inspection_completed" ? (
-                            <span className="completed-label">
-                              ✓ Completed
-                            </span>
-                          ) : application.status ===
-                            "verified" ? (
-                            <span className="completed-label">
-                              ✓ Verified
-                            </span>
-                          ) : (
-                            <Link
-                              to="/inspection"
-                              className="inspect-btn"
-                            >
-                              Inspect →
-                            </Link>
+                      <td>
+                        {application.inspection_location ||
+                          application.location ||
+                          "Not specified"}
+                      </td>
+
+                      <td>
+                        <span
+                          className={`status-badge status-${(
+                            application.status ||
+                            "pending"
+                          ).replace(/_/g, "-")}`}
+                        >
+                          {formatStatus(
+                            application.status
                           )}
-                        </td>
-                      </tr>
-                    )
-                  )}
+                        </span>
+                      </td>
+
+                      <td>
+                        {application.status ===
+                        "inspection_completed" ? (
+                          <span className="completed-label">
+                            ✓ Completed
+                          </span>
+                        ) : application.status ===
+                          "verified" ? (
+                          <span className="completed-label">
+                            ✓ Verified
+                          </span>
+                        ) : (
+                          <Link
+                            to={`/inspection?applicationId=${application.id}`}
+                            className="inspect-btn"
+                          >
+                            Inspect →
+                          </Link>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

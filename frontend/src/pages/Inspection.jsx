@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_URL from "../api";
@@ -7,8 +8,10 @@ function Inspection() {
   const navigate = useNavigate();
 
   const [applications, setApplications] = useState([]);
-  const [selectedApplication, setSelectedApplication] =
-    useState(null);
+  const [selectedApplication, setSelectedApplication] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
 
   const [formData, setFormData] = useState({
     observations: "",
@@ -17,15 +20,11 @@ function Inspection() {
     result: "pass",
   });
 
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
-
   useEffect(() => {
     loadApplications();
   }, []);
 
-  const loadApplications = async () => {
+  async function loadApplications() {
     const token = localStorage.getItem("maanaksetu_token");
     const savedUser = localStorage.getItem("maanaksetu_user");
 
@@ -50,22 +49,18 @@ function Inspection() {
       user.role !== "admin" &&
       user.role !== "gatc"
     ) {
-      setMessage(
-        "Only an authorized officer can access inspections."
-      );
+      setMessage("Only authorized officers can access inspections.");
       setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(
-        `${API_URL}/applications`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/applications`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       const data = await response.json();
 
@@ -78,38 +73,68 @@ function Inspection() {
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            "Failed to load applications"
+          data.message || "Failed to load applications"
         );
       }
 
-      setApplications(data.applications || []);
+      const applicationList = Array.isArray(data.applications)
+        ? data.applications
+        : [];
+
+      setApplications(applicationList);
+
+      const hash = window.location.hash;
+      const questionMarkIndex = hash.indexOf("?");
+
+      if (questionMarkIndex !== -1) {
+        const queryString = hash.substring(
+          questionMarkIndex + 1
+        );
+
+        const params = new URLSearchParams(queryString);
+        const applicationId = params.get("applicationId");
+
+        if (applicationId) {
+          const foundApplication = applicationList.find(
+            (application) =>
+              String(application.id) === String(applicationId)
+          );
+
+          if (foundApplication) {
+            setSelectedApplication(foundApplication);
+          }
+        }
+      }
     } catch (error) {
-      setMessage(error.message);
+      console.error("Applications loading error:", error);
+
+      setMessage(
+        error.message || "Unable to load applications."
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleChange = (event) => {
-    setFormData({
-      ...formData,
-      [event.target.name]: event.target.value,
-    });
-  };
+  function handleChange(event) {
+    const { name, value } = event.target;
 
-  const selectApplication = (application) => {
+    setFormData((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  }
+
+  function selectApplication(application) {
     setSelectedApplication(application);
     setMessage("");
-  };
+  }
 
-  const handleSubmit = async (event) => {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     if (!selectedApplication) {
-      setMessage(
-        "Please select an application first."
-      );
+      setMessage("Please select an application first.");
       return;
     }
 
@@ -137,73 +162,56 @@ function Inspection() {
       user.role !== "admin" &&
       user.role !== "gatc"
     ) {
-      setMessage(
-        "Only an authorized officer can submit an inspection."
-      );
+      setMessage("You are not authorized to submit inspections.");
       return;
+    }
+
+    let measuredValues = {};
+
+    if (formData.measuredValues.trim() !== "") {
+      try {
+        measuredValues = JSON.parse(formData.measuredValues);
+      } catch {
+        setMessage(
+          'Measured Values must be valid JSON. Example: {"error":"0.02 kg","capacity":"30 kg"}'
+        );
+        return;
+      }
     }
 
     setSubmitting(true);
     setMessage("");
 
-    let measuredValues = {};
-
-    if (formData.measuredValues.trim()) {
-      try {
-        measuredValues = JSON.parse(
-          formData.measuredValues
-        );
-      } catch {
-        setMessage(
-          'Measured Values must be valid JSON. Example: {"error":"0.02","capacity":"30 kg"}'
-        );
-        setSubmitting(false);
-        return;
-      }
-    }
-
     try {
-      const response = await fetch(
-        `${API_URL}/inspections`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            applicationId:
-              selectedApplication.id,
-            officerId: user.id,
-            inspectionDate: new Date()
-              .toISOString()
-              .split("T")[0],
-            observations:
-              formData.observations,
-            measuredValues,
-            remarks: formData.remarks,
-            result: formData.result,
-          }),
-        }
-      );
+      const response = await fetch(`${API_URL}/inspections`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          applicationId: selectedApplication.id,
+          officerId: user.id,
+          inspectionDate: new Date().toISOString(),
+          observations: formData.observations,
+          measuredValues: measuredValues,
+          remarks: formData.remarks,
+          result: formData.result,
+        }),
+      });
 
       const data = await response.json();
 
       if (response.status === 401) {
-        localStorage.removeItem(
-          "maanaksetu_token"
-        );
-        localStorage.removeItem(
-          "maanaksetu_user"
-        );
+        localStorage.removeItem("maanaksetu_token");
+        localStorage.removeItem("maanaksetu_user");
         navigate("/login");
         return;
       }
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            "Inspection submission failed"
+          data.message || "Inspection submission failed"
         );
       }
 
@@ -211,14 +219,12 @@ function Inspection() {
         `Inspection completed successfully! Result: ${formData.result.toUpperCase()}`
       );
 
-      setApplications((current) =>
-        current.map((application) =>
-          application.id ===
-          selectedApplication.id
+      setApplications((previous) =>
+        previous.map((application) =>
+          application.id === selectedApplication.id
             ? {
                 ...application,
-                status:
-                  "inspection_completed",
+                status: "inspection_completed",
               }
             : application
         )
@@ -233,17 +239,38 @@ function Inspection() {
         result: "pass",
       });
     } catch (error) {
-      setMessage(error.message);
+      console.error("Inspection submission error:", error);
+
+      setMessage(
+        error.message || "Inspection submission failed."
+      );
     } finally {
       setSubmitting(false);
     }
-  };
+  }
+
+  function getLocation(application) {
+    return (
+      application.inspection_location ||
+      application.location ||
+      "Not specified"
+    );
+  }
+
+  function formatStatus(status) {
+    if (!status) {
+      return "pending";
+    }
+
+    return status.replace(/_/g, " ");
+  }
 
   if (loading) {
     return (
       <div className="inspection-page">
         <div className="inspection-container">
           <h2>Loading Applications...</h2>
+          <p>Fetching verification applications.</p>
         </div>
       </div>
     );
@@ -296,51 +323,58 @@ function Inspection() {
 
           {applications.length === 0 ? (
             <div className="empty-inspection">
-              No verification applications found.
+              <h3>No Verification Applications Found</h3>
+
+              <p>
+                Submit a verification application from a
+                Business/User account first.
+              </p>
             </div>
           ) : (
             <div className="application-list">
-              {applications.map(
-                (application) => (
-                  <button
-                    type="button"
-                    key={application.id}
-                    className={`application-item ${
-                      selectedApplication?.id ===
-                      application.id
-                        ? "selected"
-                        : ""
-                    }`}
-                    onClick={() =>
-                      selectApplication(
-                        application
-                      )
-                    }
-                  >
-                    <div>
-                      <strong>
-                        {
-                          application.application_number
-                        }
-                      </strong>
+              {applications.map((application) => (
+                <button
+                  type="button"
+                  key={application.id}
+                  className={
+                    selectedApplication &&
+                    selectedApplication.id === application.id
+                      ? "application-item selected"
+                      : "application-item"
+                  }
+                  onClick={() => selectApplication(application)}
+                >
+                  <div>
+                    <strong>
+                      {application.application_number}
+                    </strong>
 
-                      <p>
-                        {application.instrument_type ||
-                          "Instrument"}
-                      </p>
+                    <p>
+                      {application.instrument_type ||
+                        "Instrument"}
+                    </p>
 
-                      <small>
-                        {application.location ||
-                          "Location not specified"}
-                      </small>
-                    </div>
+                    <small>
+                      Applicant:{" "}
+                      {application.applicant_name ||
+                        "Applicant"}
+                    </small>
 
-                    <span>
-                      {application.status}
-                    </span>
-                  </button>
-                )
-              )}
+                    <small>
+                      Serial:{" "}
+                      {application.serial_number || "N/A"}
+                    </small>
+
+                    <small>
+                      {getLocation(application)}
+                    </small>
+                  </div>
+
+                  <span>
+                    {formatStatus(application.status)}
+                  </span>
+                </button>
+              ))}
             </div>
           )}
         </section>
@@ -351,47 +385,72 @@ function Inspection() {
 
             <div className="application-details">
               <div>
-                <span>
-                  Application Number
-                </span>
-
+                <span>Application Number</span>
                 <strong>
-                  {
-                    selectedApplication.application_number
-                  }
+                  {selectedApplication.application_number}
+                </strong>
+              </div>
+
+              <div>
+                <span>Applicant</span>
+                <strong>
+                  {selectedApplication.applicant_name || "N/A"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Email</span>
+                <strong>
+                  {selectedApplication.applicant_email || "N/A"}
                 </strong>
               </div>
 
               <div>
                 <span>Instrument</span>
-
                 <strong>
-                  {
-                    selectedApplication.instrument_type ||
-                    "N/A"
-                  }
+                  {selectedApplication.instrument_type || "N/A"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Manufacturer</span>
+                <strong>
+                  {selectedApplication.manufacturer || "N/A"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Model Number</span>
+                <strong>
+                  {selectedApplication.model_number || "N/A"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Serial Number</span>
+                <strong>
+                  {selectedApplication.serial_number || "N/A"}
                 </strong>
               </div>
 
               <div>
                 <span>Verification Type</span>
-
                 <strong>
-                  {
-                    selectedApplication.verification_type ||
-                    "N/A"
-                  }
+                  {selectedApplication.verification_type || "N/A"}
                 </strong>
               </div>
 
               <div>
                 <span>Location</span>
-
                 <strong>
-                  {
-                    selectedApplication.location ||
-                    "N/A"
-                  }
+                  {getLocation(selectedApplication)}
+                </strong>
+              </div>
+
+              <div>
+                <span>Preferred Date</span>
+                <strong>
+                  {selectedApplication.preferred_date || "N/A"}
                 </strong>
               </div>
             </div>
@@ -410,9 +469,7 @@ function Inspection() {
 
               <textarea
                 name="observations"
-                value={
-                  formData.observations
-                }
+                value={formData.observations}
                 onChange={handleChange}
                 placeholder="Enter physical inspection observations..."
                 rows="5"
@@ -425,13 +482,15 @@ function Inspection() {
 
               <textarea
                 name="measuredValues"
-                value={
-                  formData.measuredValues
-                }
+                value={formData.measuredValues}
                 onChange={handleChange}
                 placeholder='Example: {"error":"0.02 kg","capacity":"30 kg","accuracy":"Within permissible limit"}'
                 rows="5"
               />
+
+              <small>
+                Enter measured values as valid JSON.
+              </small>
             </label>
 
             <label>
@@ -478,6 +537,8 @@ function Inspection() {
       </main>
     </div>
   );
+
 }
 
 export default Inspection;
+

@@ -28,21 +28,22 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        `${API_URL}/auth/login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        }
-      );
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.message || "Login failed");
+      }
+
+      if (!data.token || !data.user) {
+        throw new Error("Invalid login response from server");
       }
 
       localStorage.setItem(
@@ -58,10 +59,18 @@ function Login() {
       setMessage("Login successful! 🎉");
 
       setTimeout(() => {
-        if (data.user.role === "officer") {
+        const role = data.user.role;
+
+        if (role === "officer") {
           navigate("/officer-dashboard");
-        } else {
+        } else if (role === "gatc") {
+          navigate("/officer-dashboard");
+        } else if (role === "admin") {
+          navigate("/officer-dashboard");
+        } else if (role === "user") {
           navigate("/dashboard");
+        } else {
+          setMessage("Unknown user role. Please contact administrator.");
         }
       }, 700);
     } catch (error) {

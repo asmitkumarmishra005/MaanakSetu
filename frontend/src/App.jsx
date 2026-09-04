@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Link } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -10,160 +10,109 @@ import Certificates from "./pages/Certificates";
 import OfficerDashboard from "./pages/OfficerDashboard";
 import Inspection from "./pages/Inspection";
 
-function Home() {
-  return (
-    <div className="home-page">
-      <header className="home-header">
-        <div className="home-logo">
-          ⚖ MaanakSetu
-        </div>
+function ProtectedRoute({ children, allowedRoles }) {
+  const token = localStorage.getItem("token");
+  const userData = localStorage.getItem("user");
 
-        <div className="home-nav">
-          <Link to="/login">Sign In</Link>
-          <Link to="/register">Register</Link>
-        </div>
-      </header>
+  if (!token || !userData) {
+    return <Navigate to="/login" replace />;
+  }
 
-      <main className="home-content">
-        <section className="hero-section">
-          <div className="hero-badge">
-            ⚖ Digital Legal Metrology Platform
-          </div>
+  try {
+    const user = JSON.parse(userData);
 
-          <h1>
-            Making Instrument
-            <br />
-            Verification <span>Simple & Transparent</span>
-          </h1>
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      if (user.role === "officer") {
+        return <Navigate to="/officer-dashboard" replace />;
+      }
 
-          <p>
-            MaanakSetu digitizes the complete legal metrology
-            verification and certification process — from
-            application to inspection and digital certificates.
-          </p>
+      return <Navigate to="/dashboard" replace />;
+    }
 
-          <div className="hero-buttons">
-            <Link to="/login" className="primary-btn">
-              Sign In →
-            </Link>
-
-            <Link to="/register" className="secondary-btn">
-              Create Account
-            </Link>
-          </div>
-        </section>
-
-        <section className="features-section">
-          <div className="feature-card">
-            <div>⚖️</div>
-            <h3>Instrument Registration</h3>
-            <p>
-              Register weighing and measuring instruments
-              digitally.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div>📝</div>
-            <h3>Online Applications</h3>
-            <p>
-              Submit and track verification applications
-              online.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div>🔍</div>
-            <h3>Officer Inspection</h3>
-            <p>
-              Record physical inspection results digitally.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div>📜</div>
-            <h3>Digital Certificates</h3>
-            <p>
-              Generate secure certificates with QR
-              verification.
-            </p>
-          </div>
-        </section>
-
-        <section className="portal-section">
-          <h2>Access Portal</h2>
-
-          <div className="portal-buttons">
-            <Link to="/dashboard">
-              👤 User Dashboard
-            </Link>
-
-            <Link to="/officer-dashboard">
-              🔍 Officer Portal
-            </Link>
-          </div>
-        </section>
-      </main>
-
-      <footer className="home-footer">
-        <p>
-          © 2026 MaanakSetu — Digital Legal Metrology
-          Verification Platform
-        </p>
-      </footer>
-    </div>
-  );
+    return children;
+  } catch {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    return <Navigate to="/login" replace />;
+  }
 }
 
 function App() {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/" element={<Home />} />
-
+        {/* Public */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
-
         <Route path="/register" element={<Register />} />
 
+        {/* USER ONLY */}
         <Route
           path="/dashboard"
-          element={<Dashboard />}
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <Dashboard />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/register-instrument"
-          element={<InstrumentRegistration />}
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <InstrumentRegistration />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/apply-verification"
-          element={<ApplyVerification />}
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ApplyVerification />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/applications"
-          element={<Applications />}
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <Applications />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/certificates"
-          element={<Certificates />}
+          element={
+            <ProtectedRoute allowedRoles={["user", "officer", "gatc", "admin"]}>
+              <Certificates />
+            </ProtectedRoute>
+          }
         />
 
+        {/* OFFICER ONLY */}
         <Route
           path="/officer-dashboard"
-          element={<OfficerDashboard />}
+          element={
+            <ProtectedRoute allowedRoles={["officer", "gatc", "admin"]}>
+              <OfficerDashboard />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/inspection"
-          element={<Inspection />}
+          element={
+            <ProtectedRoute allowedRoles={["officer", "gatc", "admin"]}>
+              <Inspection />
+            </ProtectedRoute>
+          }
         />
 
-        <Route
-          path="*"
-          element={<Home />}
-        />
+        {/* Unknown route */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </HashRouter>
   );
