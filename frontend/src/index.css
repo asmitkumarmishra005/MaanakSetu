@@ -1,111 +1,305 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+* {
   box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  width: 100%;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f5f7fb;
+  color: #111827;
+}
+
+a {
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* =========================
+   HOME PAGE
+========================= */
+
+.home-page {
+  min-height: 100vh;
+  background: #ffffff;
+  color: #111827;
+}
+
+/* Header */
+
+.home-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 7%;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.home-logo {
+  font-size: 24px;
+  font-weight: bold;
+  color: #111827;
+}
+
+.home-nav {
+  display: flex;
+  gap: 24px;
+}
+
+.home-nav a {
+  color: #111827;
+  font-weight: 600;
+}
+
+.home-nav a:hover {
+  color: #2563eb;
+}
+
+/* Hero */
+
+.home-content {
+  width: 100%;
+}
+
+.hero-section {
+  max-width: 950px;
+  margin: 0 auto;
+  padding: 80px 25px 60px;
+  text-align: center;
+}
+
+.hero-badge {
+  display: inline-block;
+  padding: 8px 15px;
+  margin-bottom: 22px;
+  border-radius: 20px;
+  background: #eef4ff;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/*
+   IMPORTANT:
+   Explicitly set the heading color so that
+   it stays visible on every computer.
+*/
+
+.hero-section h1 {
+  margin: 0;
+  color: #111827 !important;
+  font-size: 58px;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.hero-section h1 span {
+  color: #111827 !important;
+}
+
+.hero-section p {
+  max-width: 750px;
+  margin: 25px auto 0;
+  color: #4b5563;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+/* Buttons */
+
+.hero-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.primary-btn {
+  display: inline-block;
+  padding: 13px 24px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff !important;
+  font-weight: bold;
+}
+
+.primary-btn:hover {
+  background: #1d4ed8;
+}
+
+.secondary-btn {
+  display: inline-block;
+  padding: 13px 24px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827 !important;
+  border: 1px solid #d1d5db;
+  font-weight: bold;
+}
+
+.secondary-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb !important;
+}
+
+/* =========================
+   FEATURES
+========================= */
+
+.features-section {
+  max-width: 1150px;
+  margin: 0 auto;
+  padding: 20px 25px 70px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.feature-card {
+  padding: 25px 20px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  text-align: center;
+}
+
+.feature-card > div {
+  font-size: 30px;
+  margin-bottom: 12px;
+}
+
+.feature-card h3 {
+  margin: 0 0 10px;
+  color: #111827;
+  font-size: 17px;
+}
+
+.feature-card p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* =========================
+   PORTAL
+========================= */
+
+.portal-section {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px 25px 70px;
+  text-align: center;
+}
+
+.portal-section h2 {
+  margin-bottom: 25px;
+  color: #111827;
+}
+
+.portal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.portal-buttons a {
+  display: inline-block;
+  min-width: 200px;
+  padding: 14px 20px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #dbe2ea;
+  color: #111827 !important;
+  font-weight: bold;
+}
+
+.portal-buttons a:hover {
+  border-color: #2563eb;
+  color: #2563eb !important;
+}
+
+/* =========================
+   FOOTER
+========================= */
+
+.home-footer {
+  padding: 25px;
+  text-align: center;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+}
+
+.home-footer p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 900px) {
+  .features-section {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .hero-section h1 {
+    font-size: 48px;
   }
 }
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
+
+@media (max-width: 600px) {
+  .home-header {
+    padding: 18px 5%;
+  }
+
+  .home-logo {
     font-size: 20px;
   }
-}
-p {
-  margin: 0;
-}
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
+  .home-nav {
+    gap: 12px;
+  }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  .hero-section {
+    padding: 60px 20px 50px;
+  }
+
+  .hero-section h1 {
+    font-size: 38px;
+  }
+
+  .hero-section p {
+    font-size: 16px;
+  }
+
+  .hero-buttons {
+    flex-direction: column;
+  }
+
+  .primary-btn,
+  .secondary-btn {
+    width: 100%;
+  }
+
+  .features-section {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
 }
