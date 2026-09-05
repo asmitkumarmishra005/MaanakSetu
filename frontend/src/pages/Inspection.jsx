@@ -17,6 +17,8 @@ function Inspection() {
 
   const [message, setMessage] = useState("");
 
+  // Holds a completed PASS inspection.
+  // Certificate is NOT generated automatically.
   const [completedInspection, setCompletedInspection] =
     useState(null);
 
@@ -188,8 +190,12 @@ function Inspection() {
     try {
       user = JSON.parse(savedUser);
     } catch {
-      localStorage.removeItem("maanaksetu_token");
-      localStorage.removeItem("maanaksetu_user");
+      localStorage.removeItem(
+        "maanaksetu_token"
+      );
+      localStorage.removeItem(
+        "maanaksetu_user"
+      );
       navigate("/login");
       return;
     }
@@ -214,7 +220,7 @@ function Inspection() {
         );
       } catch {
         setMessage(
-          'Measured Values must be valid JSON. Example: {"error":"0.02 kg","capacity":"30 kg"}'
+          'Measured Values must be valid JSON. Example: {"error":"0.02 kg","capacity":"30 kg","accuracy":"Within permissible limit"}'
         );
         return;
       }
@@ -224,6 +230,10 @@ function Inspection() {
     setMessage("");
 
     try {
+      // ============================================
+      // STEP 1 — SAVE INSPECTION
+      // ============================================
+
       const response = await fetch(
         `${API_URL}/inspections`,
         {
@@ -233,7 +243,8 @@ function Inspection() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            applicationId: selectedApplication.id,
+            applicationId:
+              selectedApplication.id,
             officerId: user.id,
             inspectionDate:
               new Date().toISOString(),
@@ -280,9 +291,9 @@ function Inspection() {
       const result =
         String(formData.result).toLowerCase();
 
-      // =========================================
-      // PASS → SHOW GENERATE CERTIFICATE BUTTON
-      // =========================================
+      // ============================================
+      // PASS
+      // ============================================
 
       if (result === "pass") {
         setCompletedInspection({
@@ -293,49 +304,40 @@ function Inspection() {
             selectedApplication.application_number,
         });
 
-        setApplications((previous) =>
-          previous.map((application) =>
-            application.id ===
-            selectedApplication.id
-              ? {
-                  ...application,
-                  status:
-                    "inspection_completed",
-                }
-              : application
-          )
-        );
-
         setMessage(
-          "✅ Inspection completed successfully. Instrument PASSED. You can now generate the certificate."
+          "✅ Inspection completed successfully. The instrument PASSED. Please generate the certificate below."
         );
       }
 
-      // =========================================
-      // FAIL → NO CERTIFICATE BUTTON
-      // =========================================
+      // ============================================
+      // FAIL
+      // ============================================
 
       else {
         setCompletedInspection(null);
 
-        setApplications((previous) =>
-          previous.map((application) =>
-            application.id ===
-            selectedApplication.id
-              ? {
-                  ...application,
-                  status:
-                    "inspection_completed",
-                }
-              : application
-          )
-        );
-
         setMessage(
-          "❌ Inspection completed. Instrument FAILED inspection. Certificate cannot be generated."
+          "❌ Inspection completed successfully. The instrument FAILED. No certificate can be generated."
         );
       }
 
+      // Update current application in UI
+      setApplications((previous) =>
+        previous.map((application) =>
+          application.id === selectedApplication.id
+            ? {
+                ...application,
+                status:
+                  result === "pass"
+                    ? "inspection_completed"
+                    : "inspection_completed",
+              }
+            : application
+        )
+      );
+
+      // Clear selected application so the
+      // certificate section can appear separately.
       setSelectedApplication(null);
 
       setFormData({
@@ -359,10 +361,6 @@ function Inspection() {
     }
   }
 
-  // =============================================
-  // GENERATE CERTIFICATE
-  // =============================================
-
   async function handleGenerateCertificate() {
     if (!completedInspection?.id) {
       setMessage(
@@ -384,6 +382,10 @@ function Inspection() {
     setMessage("");
 
     try {
+      // ============================================
+      // GENERATE CERTIFICATE ONLY AFTER PASS
+      // ============================================
+
       const response = await fetch(
         `${API_URL}/certificates/generate/${completedInspection.id}`,
         {
@@ -415,18 +417,22 @@ function Inspection() {
         );
       }
 
-      setGeneratedCertificate(
-        data?.certificate || null
-      );
+      const certificate =
+        data?.certificate || null;
+
+      setGeneratedCertificate(certificate);
+
+      setCompletedInspection(null);
 
       setMessage(
         `🎉 Certificate generated successfully! ${
-          data?.certificate?.certificate_number
-            ? `Certificate No: ${data.certificate.certificate_number}`
+          certificate?.certificate_number
+            ? `Certificate No: ${certificate.certificate_number}`
             : ""
         }`
       );
 
+      // Update application status
       setApplications((previous) =>
         previous.map((application) =>
           application.id ===
@@ -439,11 +445,8 @@ function Inspection() {
         )
       );
 
-      // Remove button after successful generation
-      setCompletedInspection(null);
-
       console.log(
-        "Certificate generated:",
+        "Certificate generation response:",
         data
       );
     } catch (error) {
@@ -482,7 +485,6 @@ function Inspection() {
       <div className="inspection-page">
         <div className="inspection-container">
           <h2>Loading Applications...</h2>
-
           <p>
             Fetching verification applications.
           </p>
@@ -493,6 +495,7 @@ function Inspection() {
 
   return (
     <div className="inspection-page">
+
       <header className="inspection-header">
         <div>
           <h1>⚖ MaanakSetu</h1>
@@ -521,6 +524,8 @@ function Inspection() {
             </p>
           </div>
         </div>
+
+        {/* MESSAGE */}
 
         {message && (
           <div
@@ -562,7 +567,9 @@ function Inspection() {
               </div>
 
               <div>
-                <span>Status</span>
+                <span>
+                  Status
+                </span>
 
                 <strong>
                   Verified
@@ -589,12 +596,14 @@ function Inspection() {
               <button
                 type="button"
                 className="inspection-submit"
+                style={{
+                  marginTop: "20px",
+                }}
                 onClick={() =>
                   navigate(
                     `/certificates/${generatedCertificate.id}`
                   )
                 }
-                style={{ marginTop: "20px" }}
               >
                 📜 View Certificate
               </button>
@@ -608,10 +617,14 @@ function Inspection() {
         ========================================= */}
 
         <section className="inspection-section">
-          <h3>1. Select Application</h3>
+
+          <h3>
+            1. Select Application
+          </h3>
 
           {applications.length === 0 ? (
             <div className="empty-inspection">
+
               <h3>
                 No Verification Applications Found
               </h3>
@@ -620,6 +633,7 @@ function Inspection() {
                 Submit a verification application
                 from a Business/User account first.
               </p>
+
             </div>
           ) : (
             <div className="application-list">
@@ -645,6 +659,7 @@ function Inspection() {
                   >
 
                     <div>
+
                       <strong>
                         {
                           application.application_number
@@ -673,6 +688,7 @@ function Inspection() {
                           application
                         )}
                       </small>
+
                     </div>
 
                     <span>
@@ -688,6 +704,7 @@ function Inspection() {
 
             </div>
           )}
+
         </section>
 
         {/* =========================================
@@ -719,8 +736,10 @@ function Inspection() {
                 <span>Applicant</span>
 
                 <strong>
-                  {selectedApplication.applicant_name ||
-                    "N/A"}
+                  {
+                    selectedApplication.applicant_name ||
+                    "N/A"
+                  }
                 </strong>
               </div>
 
@@ -736,7 +755,9 @@ function Inspection() {
               </div>
 
               <div>
-                <span>Instrument</span>
+                <span>
+                  Instrument
+                </span>
 
                 <strong>
                   {
@@ -747,7 +768,9 @@ function Inspection() {
               </div>
 
               <div>
-                <span>Manufacturer</span>
+                <span>
+                  Manufacturer
+                </span>
 
                 <strong>
                   {
@@ -758,7 +781,9 @@ function Inspection() {
               </div>
 
               <div>
-                <span>Model Number</span>
+                <span>
+                  Model Number
+                </span>
 
                 <strong>
                   {
@@ -769,7 +794,9 @@ function Inspection() {
               </div>
 
               <div>
-                <span>Serial Number</span>
+                <span>
+                  Serial Number
+                </span>
 
                 <strong>
                   {
@@ -793,7 +820,9 @@ function Inspection() {
               </div>
 
               <div>
-                <span>Location</span>
+                <span>
+                  Location
+                </span>
 
                 <strong>
                   {getLocation(
@@ -866,6 +895,7 @@ function Inspection() {
                 Enter measured values as
                 valid JSON.
               </small>
+
             </label>
 
             <label>
@@ -873,9 +903,7 @@ function Inspection() {
 
               <textarea
                 name="remarks"
-                value={
-                  formData.remarks
-                }
+                value={formData.remarks}
                 onChange={handleChange}
                 placeholder="Enter final inspection remarks..."
                 rows="4"
@@ -890,6 +918,7 @@ function Inspection() {
                 value={formData.result}
                 onChange={handleChange}
               >
+
                 <option value="pass">
                   PASS — Instrument Verified
                 </option>
@@ -897,6 +926,7 @@ function Inspection() {
                 <option value="fail">
                   FAIL — Instrument Not Verified
                 </option>
+
               </select>
             </label>
 
@@ -950,10 +980,12 @@ function Inspection() {
               </div>
 
               <div>
-                <span>Status</span>
+                <span>
+                  Inspection Status
+                </span>
 
                 <strong>
-                  Inspection Completed
+                  Completed
                 </strong>
               </div>
 
@@ -968,12 +1000,12 @@ function Inspection() {
               }}
             >
               <strong>
-                The instrument passed inspection.
+                ✅ Instrument Passed Inspection
               </strong>
 
               <p>
                 The inspection is complete.
-                Click below to officially
+                Click the button below to officially
                 generate the digital certificate.
               </p>
             </div>
@@ -984,9 +1016,7 @@ function Inspection() {
               onClick={
                 handleGenerateCertificate
               }
-              disabled={
-                generatingCertificate
-              }
+              disabled={generatingCertificate}
               style={{
                 marginTop: "20px",
               }}
