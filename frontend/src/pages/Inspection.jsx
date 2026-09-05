@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_URL from "../api";
@@ -17,8 +18,8 @@ function Inspection() {
 
   const [message, setMessage] = useState("");
 
-  // Holds a completed PASS inspection.
-  // Certificate is NOT generated automatically.
+  // This stores a completed PASS inspection
+  // until the officer generates its certificate.
   const [completedInspection, setCompletedInspection] =
     useState(null);
 
@@ -102,6 +103,8 @@ function Inspection() {
 
       setApplications(applicationList);
 
+      // Support:
+      // /inspection?applicationId=APPLICATION_ID
       const hash = window.location.hash;
       const questionMarkIndex = hash.indexOf("?");
 
@@ -190,12 +193,8 @@ function Inspection() {
     try {
       user = JSON.parse(savedUser);
     } catch {
-      localStorage.removeItem(
-        "maanaksetu_token"
-      );
-      localStorage.removeItem(
-        "maanaksetu_user"
-      );
+      localStorage.removeItem("maanaksetu_token");
+      localStorage.removeItem("maanaksetu_user");
       navigate("/login");
       return;
     }
@@ -211,6 +210,7 @@ function Inspection() {
       return;
     }
 
+    // Convert measured values text into an object.
     let measuredValues = {};
 
     if (formData.measuredValues.trim() !== "") {
@@ -228,6 +228,8 @@ function Inspection() {
 
     setSubmitting(true);
     setMessage("");
+    setGeneratedCertificate(null);
+    setCompletedInspection(null);
 
     try {
       // ============================================
@@ -243,8 +245,7 @@ function Inspection() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            applicationId:
-              selectedApplication.id,
+            applicationId: selectedApplication.id,
             officerId: user.id,
             inspectionDate:
               new Date().toISOString(),
@@ -260,12 +261,8 @@ function Inspection() {
       const data = await response.json();
 
       if (response.status === 401) {
-        localStorage.removeItem(
-          "maanaksetu_token"
-        );
-        localStorage.removeItem(
-          "maanaksetu_user"
-        );
+        localStorage.removeItem("maanaksetu_token");
+        localStorage.removeItem("maanaksetu_user");
         navigate("/login");
         return;
       }
@@ -277,25 +274,34 @@ function Inspection() {
         );
       }
 
+      // Handle the common backend response:
+      // { success: true, inspection: { id: "..." } }
       const inspectionId =
         data?.inspection?.id ||
         data?.inspectionId ||
         data?.id;
 
       if (!inspectionId) {
+        console.error(
+          "Inspection response:",
+          data
+        );
+
         throw new Error(
-          "Inspection was saved, but the inspection ID was not returned."
+          "Inspection was saved, but the server did not return an inspection ID."
         );
       }
 
-      const result =
-        String(formData.result).toLowerCase();
+      const result = String(
+        formData.result
+      ).toLowerCase();
 
       // ============================================
-      // PASS
+      // STEP 2 — PASS
       // ============================================
 
       if (result === "pass") {
+        // THIS is what makes the button appear.
         setCompletedInspection({
           id: inspectionId,
           applicationId:
@@ -305,39 +311,51 @@ function Inspection() {
         });
 
         setMessage(
-          "✅ Inspection completed successfully. The instrument PASSED. Please generate the certificate below."
+          "✅ Inspection completed successfully. The instrument PASSED inspection. You can now generate the certificate."
+        );
+
+        setApplications((previous) =>
+          previous.map((application) =>
+            application.id ===
+            selectedApplication.id
+              ? {
+                  ...application,
+                  status:
+                    "inspection_completed",
+                }
+              : application
+          )
         );
       }
 
       // ============================================
-      // FAIL
+      // STEP 3 — FAIL
       // ============================================
 
       else {
         setCompletedInspection(null);
 
         setMessage(
-          "❌ Inspection completed successfully. The instrument FAILED. No certificate can be generated."
+          "❌ Inspection completed successfully. The instrument FAILED inspection. Certificate cannot be generated."
+        );
+
+        setApplications((previous) =>
+          previous.map((application) =>
+            application.id ===
+            selectedApplication.id
+              ? {
+                  ...application,
+                  status:
+                    "inspection_completed",
+                }
+              : application
+          )
         );
       }
 
-      // Update current application in UI
-      setApplications((previous) =>
-        previous.map((application) =>
-          application.id === selectedApplication.id
-            ? {
-                ...application,
-                status:
-                  result === "pass"
-                    ? "inspection_completed"
-                    : "inspection_completed",
-              }
-            : application
-        )
-      );
-
-      // Clear selected application so the
-      // certificate section can appear separately.
+      // Hide the selected application/form.
+      // The PASS certificate section remains visible
+      // because completedInspection is stored separately.
       setSelectedApplication(null);
 
       setFormData({
@@ -361,6 +379,10 @@ function Inspection() {
     }
   }
 
+  // ================================================
+  // GENERATE CERTIFICATE
+  // ================================================
+
   async function handleGenerateCertificate() {
     if (!completedInspection?.id) {
       setMessage(
@@ -382,10 +404,6 @@ function Inspection() {
     setMessage("");
 
     try {
-      // ============================================
-      // GENERATE CERTIFICATE ONLY AFTER PASS
-      // ============================================
-
       const response = await fetch(
         `${API_URL}/certificates/generate/${completedInspection.id}`,
         {
@@ -406,6 +424,7 @@ function Inspection() {
         localStorage.removeItem(
           "maanaksetu_user"
         );
+
         navigate("/login");
         return;
       }
@@ -420,19 +439,44 @@ function Inspection() {
       const certificate =
         data?.certificate || null;
 
-      setGeneratedCertificate(certificate);
+      if (!certificate) {
+        console.error(
+          "Certificate response:",
+          data
+        );
 
-      setCompletedInspection(null);
+        throw new Error(
+          "Certificate endpoint succeeded but no certificate was returned."
+        );
+      }
+
+      setGeneratedCertificate(certificate);
 
       setMessage(
         `🎉 Certificate generated successfully! ${
-          certificate?.certificate_number
+          certificate.certificate_number
             ? `Certificate No: ${certificate.certificate_number}`
             : ""
         }`
       );
 
-      // Update application status
+      console.log(
+        "Certificate generated:",
+        data
+      );
+
+      if (data.verificationUrl) {
+        console.log(
+          "Verification URL:",
+          data.verificationUrl
+        );
+      }
+
+      // Certificate is already generated,
+      // so remove the generation button.
+      setCompletedInspection(null);
+
+      // Update application status locally.
       setApplications((previous) =>
         previous.map((application) =>
           application.id ===
@@ -443,11 +487,6 @@ function Inspection() {
               }
             : application
         )
-      );
-
-      console.log(
-        "Certificate generation response:",
-        data
       );
     } catch (error) {
       console.error(
@@ -485,6 +524,7 @@ function Inspection() {
       <div className="inspection-page">
         <div className="inspection-container">
           <h2>Loading Applications...</h2>
+
           <p>
             Fetching verification applications.
           </p>
@@ -525,7 +565,9 @@ function Inspection() {
           </div>
         </div>
 
-        {/* MESSAGE */}
+        {/* =========================================
+            MESSAGE
+        ========================================= */}
 
         {message && (
           <div
@@ -541,7 +583,7 @@ function Inspection() {
         )}
 
         {/* =========================================
-            CERTIFICATE GENERATED
+            GENERATED CERTIFICATE
         ========================================= */}
 
         {generatedCertificate && (
@@ -698,7 +740,6 @@ function Inspection() {
                     </span>
 
                   </button>
-
                 )
               )}
 
@@ -733,7 +774,9 @@ function Inspection() {
               </div>
 
               <div>
-                <span>Applicant</span>
+                <span>
+                  Applicant
+                </span>
 
                 <strong>
                   {
@@ -744,7 +787,9 @@ function Inspection() {
               </div>
 
               <div>
-                <span>Email</span>
+                <span>
+                  Email
+                </span>
 
                 <strong>
                   {
@@ -895,7 +940,6 @@ function Inspection() {
                 Enter measured values as
                 valid JSON.
               </small>
-
             </label>
 
             <label>
@@ -903,7 +947,9 @@ function Inspection() {
 
               <textarea
                 name="remarks"
-                value={formData.remarks}
+                value={
+                  formData.remarks
+                }
                 onChange={handleChange}
                 placeholder="Enter final inspection remarks..."
                 rows="4"
@@ -945,6 +991,7 @@ function Inspection() {
 
         {/* =========================================
             4. GENERATE CERTIFICATE
+            ONLY APPEARS AFTER PASS
         ========================================= */}
 
         {completedInspection && (
@@ -994,7 +1041,7 @@ function Inspection() {
             <div
               style={{
                 marginTop: "20px",
-                padding: "16px",
+                padding: "18px",
                 borderRadius: "10px",
                 background: "#e8f7ee",
               }}
@@ -1005,7 +1052,13 @@ function Inspection() {
 
               <p>
                 The inspection is complete.
-                Click the button below to officially
+                The certificate has NOT been
+                generated yet.
+              </p>
+
+              <p>
+                Review the result and click
+                the button below to officially
                 generate the digital certificate.
               </p>
             </div>
@@ -1016,7 +1069,9 @@ function Inspection() {
               onClick={
                 handleGenerateCertificate
               }
-              disabled={generatingCertificate}
+              disabled={
+                generatingCertificate
+              }
               style={{
                 marginTop: "20px",
               }}
@@ -1035,3 +1090,4 @@ function Inspection() {
 }
 
 export default Inspection;
+
