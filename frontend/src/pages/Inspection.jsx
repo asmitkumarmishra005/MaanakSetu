@@ -272,24 +272,44 @@ function Inspection() {
 
       // Try all common response structures
       const inspectionId =
-        inspectionData?.inspection?.id ||
-        inspectionData?.inspectionId ||
-        inspectionData?.id;
+  inspectionData?.inspection?.id ||
+  inspectionData?.inspectionId ||
+  inspectionData?.id;
 
-      if (!inspectionId) {
-        throw new Error(
-          "Inspection was saved, but the backend did not return an inspection ID."
-        );
-      }
+if (!inspectionId) {
+  throw new Error(
+    "Inspection was saved, but the backend did not return an inspection ID."
+  );
+}
 
-      // =========================================
-      // STEP 2: GENERATE CERTIFICATE FOR PASS
-      // =========================================
+if (formData.result.toLowerCase() === "pass") {
+  const certificateResponse = await fetch(
+    `${API_URL}/certificates/generate/${inspectionId}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
-      if (
-        formData.result.toLowerCase() ===
-        "pass"
-      ) {
+  const certificateData =
+    await certificateResponse.json();
+
+  if (!certificateResponse.ok) {
+    throw new Error(
+      certificateData.message ||
+        "Inspection completed, but certificate generation failed."
+    );
+  }
+
+  setMessage(
+    `Inspection passed and certificate generated successfully! ✅ Certificate: ${
+      certificateData?.certificate?.certificate_number || "Generated"
+    }`
+  );
+}
         const certificateResponse =
           await fetch(
             `${API_URL}/certificates/generate/${inspectionId}`,
