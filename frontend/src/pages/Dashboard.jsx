@@ -7,12 +7,14 @@ function Dashboard() {
   const navigate = useNavigate();
 
   const [user, setUser] = useState(null);
+
   const [stats, setStats] = useState({
     pending: 0,
     instruments: 0,
     certificates: 0,
     expiring: 0,
   });
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,6 +30,7 @@ function Dashboard() {
       const currentUser = JSON.parse(savedUser);
 
       setUser(currentUser);
+
       loadDashboardData(currentUser.id, token);
     } catch (error) {
       console.error("Invalid saved user:", error);
@@ -51,14 +54,17 @@ function Dashboard() {
         certificatesResponse,
       ] = await Promise.all([
         fetch(`${API_URL}/instruments/user/${userId}`, {
+          method: "GET",
           headers,
         }),
 
         fetch(`${API_URL}/applications/user/${userId}`, {
+          method: "GET",
           headers,
         }),
 
-        fetch(`${API_URL}/certificates/user/${userId}`, {
+        fetch(`${API_URL}/certificates/my`, {
+          method: "GET",
           headers,
         }),
       ]);
@@ -75,6 +81,27 @@ function Dashboard() {
         return;
       }
 
+      if (
+        !instrumentsResponse.ok ||
+        !applicationsResponse.ok ||
+        !certificatesResponse.ok
+      ) {
+        console.error("Dashboard API error:", {
+          instruments: instrumentsResponse.status,
+          applications: applicationsResponse.status,
+          certificates: certificatesResponse.status,
+        });
+
+        setStats({
+          pending: 0,
+          instruments: 0,
+          certificates: 0,
+          expiring: 0,
+        });
+
+        return;
+      }
+
       const instrumentsData =
         await instrumentsResponse.json();
 
@@ -85,18 +112,25 @@ function Dashboard() {
         await certificatesResponse.json();
 
       const instruments =
-        instrumentsData.instruments || [];
+        Array.isArray(instrumentsData.instruments)
+          ? instrumentsData.instruments
+          : [];
 
       const applications =
-        applicationsData.applications || [];
+        Array.isArray(applicationsData.applications)
+          ? applicationsData.applications
+          : [];
 
       const certificates =
-        certificatesData.certificates || [];
+        Array.isArray(certificatesData.certificates)
+          ? certificatesData.certificates
+          : [];
 
       const pending = applications.filter(
         (application) =>
           application.status !== "verified" &&
-          application.status !== "rejected"
+          application.status !== "rejected" &&
+          application.status !== "cancelled"
       ).length;
 
       const today = new Date();

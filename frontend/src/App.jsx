@@ -1,3 +1,5 @@
+import VerifyCertificate from "./pages/VerifyCertificate";
+import CertificateDetails from "./pages/CertificateDetails";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login";
@@ -11,19 +13,31 @@ import OfficerDashboard from "./pages/OfficerDashboard";
 import Inspection from "./pages/Inspection";
 
 function ProtectedRoute({ children, allowedRoles }) {
-  const token = localStorage.getItem("token");
-  const userData = localStorage.getItem("user");
+  const token = localStorage.getItem("maanaksetu_token");
+  const savedUser = localStorage.getItem("maanaksetu_user");
 
-  if (!token || !userData) {
+  if (!token || !savedUser) {
     return <Navigate to="/login" replace />;
   }
 
   try {
-    const user = JSON.parse(userData);
+    const user = JSON.parse(savedUser);
 
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
-      if (user.role === "officer") {
-        return <Navigate to="/officer-dashboard" replace />;
+    if (
+      allowedRoles &&
+      !allowedRoles.includes(user.role)
+    ) {
+      if (
+        user.role === "officer" ||
+        user.role === "gatc" ||
+        user.role === "admin"
+      ) {
+        return (
+          <Navigate
+            to="/officer-dashboard"
+            replace
+          />
+        );
       }
 
       return <Navigate to="/dashboard" replace />;
@@ -31,8 +45,9 @@ function ProtectedRoute({ children, allowedRoles }) {
 
     return children;
   } catch {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    localStorage.removeItem("maanaksetu_token");
+    localStorage.removeItem("maanaksetu_user");
+
     return <Navigate to="/login" replace />;
   }
 }
@@ -41,12 +56,30 @@ function App() {
   return (
     <HashRouter>
       <Routes>
-        {/* Public */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
 
-        {/* USER ONLY */}
+        {/* =========================
+            PUBLIC ROUTES
+        ========================= */}
+
+        <Route
+          path="/"
+          element={<Navigate to="/login" replace />}
+        />
+
+        <Route
+          path="/login"
+          element={<Login />}
+        />
+
+        <Route
+          path="/register"
+          element={<Register />}
+        />
+
+        {/* =========================
+            USER ROUTES
+        ========================= */}
+
         <Route
           path="/dashboard"
           element={
@@ -83,20 +116,55 @@ function App() {
           }
         />
 
+        {/* =========================
+            CERTIFICATES
+        ========================= */}
+
         <Route
           path="/certificates"
           element={
-            <ProtectedRoute allowedRoles={["user", "officer", "gatc", "admin"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                "user",
+                "officer",
+                "gatc",
+                "admin",
+              ]}
+            >
               <Certificates />
             </ProtectedRoute>
           }
         />
+        <Route
+  path="/certificates/:id"
+  element={
+    <ProtectedRoute
+      allowedRoles={[
+        "user",
+        "officer",
+        "gatc",
+        "admin",
+      ]}
+    >
+      <CertificateDetails />
+    </ProtectedRoute>
+  }
+/>
 
-        {/* OFFICER ONLY */}
+        {/* =========================
+            OFFICER ROUTES
+        ========================= */}
+
         <Route
           path="/officer-dashboard"
           element={
-            <ProtectedRoute allowedRoles={["officer", "gatc", "admin"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                "officer",
+                "gatc",
+                "admin",
+              ]}
+            >
               <OfficerDashboard />
             </ProtectedRoute>
           }
@@ -105,14 +173,30 @@ function App() {
         <Route
           path="/inspection"
           element={
-            <ProtectedRoute allowedRoles={["officer", "gatc", "admin"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                "officer",
+                "gatc",
+                "admin",
+              ]}
+            >
               <Inspection />
             </ProtectedRoute>
           }
         />
 
-        {/* Unknown route */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* =========================
+            UNKNOWN ROUTE
+        ========================= */}
+<Route
+  path="/verify/:code"
+  element={<VerifyCertificate />}
+/>
+        <Route
+          path="*"
+          element={<Navigate to="/login" replace />}
+        />
+
       </Routes>
     </HashRouter>
   );
