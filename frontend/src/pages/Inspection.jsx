@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_URL from "../api";
@@ -18,8 +17,6 @@ function Inspection() {
 
   const [message, setMessage] = useState("");
 
-  // Stores the completed PASS inspection waiting
-  // for officer confirmation to generate certificate.
   const [completedInspection, setCompletedInspection] =
     useState(null);
 
@@ -103,8 +100,6 @@ function Inspection() {
 
       setApplications(applicationList);
 
-      // Support direct opening with:
-      // /inspection?applicationId=...
       const hash = window.location.hash;
       const questionMarkIndex = hash.indexOf("?");
 
@@ -126,7 +121,9 @@ function Inspection() {
             );
 
           if (foundApplication) {
-            setSelectedApplication(foundApplication);
+            setSelectedApplication(
+              foundApplication
+            );
           }
         }
       }
@@ -167,7 +164,9 @@ function Inspection() {
     event.preventDefault();
 
     if (!selectedApplication) {
-      setMessage("Please select an application first.");
+      setMessage(
+        "Please select an application first."
+      );
       return;
     }
 
@@ -215,7 +214,7 @@ function Inspection() {
         );
       } catch {
         setMessage(
-          'Measured Values must be valid JSON. Example: {"error":"0.02 kg","capacity":"30 kg","accuracy":"Within permissible limit"}'
+          'Measured Values must be valid JSON. Example: {"error":"0.02 kg","capacity":"30 kg"}'
         );
         return;
       }
@@ -225,10 +224,6 @@ function Inspection() {
     setMessage("");
 
     try {
-      // ============================================
-      // STEP 1 — SUBMIT INSPECTION
-      // ============================================
-
       const response = await fetch(
         `${API_URL}/inspections`,
         {
@@ -254,8 +249,12 @@ function Inspection() {
       const data = await response.json();
 
       if (response.status === 401) {
-        localStorage.removeItem("maanaksetu_token");
-        localStorage.removeItem("maanaksetu_user");
+        localStorage.removeItem(
+          "maanaksetu_token"
+        );
+        localStorage.removeItem(
+          "maanaksetu_user"
+        );
         navigate("/login");
         return;
       }
@@ -263,11 +262,10 @@ function Inspection() {
       if (!response.ok) {
         throw new Error(
           data.message ||
-            "Inspection submission failed"
+            "Inspection submission failed."
         );
       }
 
-      // Get inspection ID returned by backend
       const inspectionId =
         data?.inspection?.id ||
         data?.inspectionId ||
@@ -280,11 +278,11 @@ function Inspection() {
       }
 
       const result =
-        formData.result.toLowerCase();
+        String(formData.result).toLowerCase();
 
-      // ============================================
-      // PASS
-      // ============================================
+      // =========================================
+      // PASS → SHOW GENERATE CERTIFICATE BUTTON
+      // =========================================
 
       if (result === "pass") {
         setCompletedInspection({
@@ -295,11 +293,6 @@ function Inspection() {
             selectedApplication.application_number,
         });
 
-        setMessage(
-          "✅ Inspection completed successfully. The instrument PASSED inspection. You can now generate the certificate."
-        );
-
-        // Update application status locally
         setApplications((previous) =>
           previous.map((application) =>
             application.id ===
@@ -312,11 +305,15 @@ function Inspection() {
               : application
           )
         );
+
+        setMessage(
+          "✅ Inspection completed successfully. Instrument PASSED. You can now generate the certificate."
+        );
       }
 
-      // ============================================
-      // FAIL
-      // ============================================
+      // =========================================
+      // FAIL → NO CERTIFICATE BUTTON
+      // =========================================
 
       else {
         setCompletedInspection(null);
@@ -335,19 +332,18 @@ function Inspection() {
         );
 
         setMessage(
-          "❌ Inspection completed successfully. The instrument FAILED inspection, so no certificate can be generated."
+          "❌ Inspection completed. Instrument FAILED inspection. Certificate cannot be generated."
         );
       }
 
-      // Clear form after inspection
+      setSelectedApplication(null);
+
       setFormData({
         observations: "",
         measuredValues: "",
         remarks: "",
         result: "pass",
       });
-
-      setSelectedApplication(null);
     } catch (error) {
       console.error(
         "Inspection submission error:",
@@ -363,9 +359,9 @@ function Inspection() {
     }
   }
 
-  // ==================================================
+  // =============================================
   // GENERATE CERTIFICATE
-  // ==================================================
+  // =============================================
 
   async function handleGenerateCertificate() {
     if (!completedInspection?.id) {
@@ -408,7 +404,6 @@ function Inspection() {
         localStorage.removeItem(
           "maanaksetu_user"
         );
-
         navigate("/login");
         return;
       }
@@ -420,42 +415,37 @@ function Inspection() {
         );
       }
 
-      const certificate =
-        data?.certificate || null;
-
-      setGeneratedCertificate(certificate);
+      setGeneratedCertificate(
+        data?.certificate || null
+      );
 
       setMessage(
         `🎉 Certificate generated successfully! ${
-          certificate?.certificate_number
-            ? `Certificate No: ${certificate.certificate_number}`
+          data?.certificate?.certificate_number
+            ? `Certificate No: ${data.certificate.certificate_number}`
             : ""
         }`
       );
+
+      setApplications((previous) =>
+        previous.map((application) =>
+          application.id ===
+          completedInspection.applicationId
+            ? {
+                ...application,
+                status: "verified",
+              }
+            : application
+        )
+      );
+
+      // Remove button after successful generation
+      setCompletedInspection(null);
 
       console.log(
         "Certificate generated:",
         data
       );
-
-      // Update application status in local UI
-      if (completedInspection.applicationId) {
-        setApplications((previous) =>
-          previous.map((application) =>
-            application.id ===
-            completedInspection.applicationId
-              ? {
-                  ...application,
-                  status: "verified",
-                }
-              : application
-          )
-        );
-      }
-
-      // Certificate generated, so disable
-      // the Generate Certificate button.
-      setCompletedInspection(null);
     } catch (error) {
       console.error(
         "Certificate generation error:",
@@ -506,10 +496,7 @@ function Inspection() {
       <header className="inspection-header">
         <div>
           <h1>⚖ MaanakSetu</h1>
-
-          <p>
-            Officer Inspection Portal
-          </p>
+          <p>Officer Inspection Portal</p>
         </div>
 
         <Link
@@ -521,6 +508,7 @@ function Inspection() {
       </header>
 
       <main className="inspection-container">
+
         <div className="inspection-title">
           <span>🔍</span>
 
@@ -547,15 +535,19 @@ function Inspection() {
           </div>
         )}
 
-        {/* ===========================================
-            CERTIFICATE GENERATION RESULT
-        =========================================== */}
+        {/* =========================================
+            CERTIFICATE GENERATED
+        ========================================= */}
 
         {generatedCertificate && (
           <section className="inspection-section">
-            <h3>🎉 Certificate Generated</h3>
+
+            <h3>
+              🎉 Certificate Generated
+            </h3>
 
             <div className="application-details">
+
               <div>
                 <span>
                   Certificate Number
@@ -572,7 +564,9 @@ function Inspection() {
               <div>
                 <span>Status</span>
 
-                <strong>Verified</strong>
+                <strong>
+                  Verified
+                </strong>
               </div>
 
               {generatedCertificate.verification_code && (
@@ -588,16 +582,10 @@ function Inspection() {
                   </strong>
                 </div>
               )}
+
             </div>
 
-            <div
-              style={{
-                marginTop: "20px",
-                display: "flex",
-                gap: "12px",
-                flexWrap: "wrap",
-              }}
-            >
+            {generatedCertificate.id && (
               <button
                 type="button"
                 className="inspection-submit"
@@ -606,16 +594,18 @@ function Inspection() {
                     `/certificates/${generatedCertificate.id}`
                   )
                 }
+                style={{ marginTop: "20px" }}
               >
                 📜 View Certificate
               </button>
-            </div>
+            )}
+
           </section>
         )}
 
-        {/* ===========================================
-            APPLICATION LIST
-        =========================================== */}
+        {/* =========================================
+            1. SELECT APPLICATION
+        ========================================= */}
 
         <section className="inspection-section">
           <h3>1. Select Application</h3>
@@ -633,8 +623,10 @@ function Inspection() {
             </div>
           ) : (
             <div className="application-list">
+
               {applications.map(
                 (application) => (
+
                   <button
                     type="button"
                     key={application.id}
@@ -651,6 +643,7 @@ function Inspection() {
                       )
                     }
                   >
+
                     <div>
                       <strong>
                         {
@@ -687,22 +680,29 @@ function Inspection() {
                         application.status
                       )}
                     </span>
+
                   </button>
+
                 )
               )}
+
             </div>
           )}
         </section>
 
-        {/* ===========================================
-            APPLICATION DETAILS
-        =========================================== */}
+        {/* =========================================
+            2. APPLICATION DETAILS
+        ========================================= */}
 
         {selectedApplication && (
           <section className="inspection-section">
-            <h3>2. Application Details</h3>
+
+            <h3>
+              2. Application Details
+            </h3>
 
             <div className="application-details">
+
               <div>
                 <span>
                   Application Number
@@ -803,7 +803,9 @@ function Inspection() {
               </div>
 
               <div>
-                <span>Preferred Date</span>
+                <span>
+                  Preferred Date
+                </span>
 
                 <strong>
                   {
@@ -812,27 +814,34 @@ function Inspection() {
                   }
                 </strong>
               </div>
+
             </div>
+
           </section>
         )}
 
-        {/* ===========================================
-            INSPECTION FORM
-        =========================================== */}
+        {/* =========================================
+            3. INSPECTION FORM
+        ========================================= */}
 
         {selectedApplication && (
           <form
             className="inspection-section inspection-form"
             onSubmit={handleSubmit}
           >
-            <h3>3. Inspection Results</h3>
+
+            <h3>
+              3. Inspection Results
+            </h3>
 
             <label>
               Observations
 
               <textarea
                 name="observations"
-                value={formData.observations}
+                value={
+                  formData.observations
+                }
                 onChange={handleChange}
                 placeholder="Enter physical inspection observations..."
                 rows="5"
@@ -845,15 +854,17 @@ function Inspection() {
 
               <textarea
                 name="measuredValues"
-                value={formData.measuredValues}
+                value={
+                  formData.measuredValues
+                }
                 onChange={handleChange}
                 placeholder='Example: {"error":"0.02 kg","capacity":"30 kg","accuracy":"Within permissible limit"}'
                 rows="5"
               />
 
               <small>
-                Enter measured values as valid
-                JSON.
+                Enter measured values as
+                valid JSON.
               </small>
             </label>
 
@@ -862,7 +873,9 @@ function Inspection() {
 
               <textarea
                 name="remarks"
-                value={formData.remarks}
+                value={
+                  formData.remarks
+                }
                 onChange={handleChange}
                 placeholder="Enter final inspection remarks..."
                 rows="4"
@@ -896,20 +909,23 @@ function Inspection() {
                 ? "Submitting Inspection..."
                 : "Submit Official Inspection →"}
             </button>
+
           </form>
         )}
 
-        {/* ===========================================
-            GENERATE CERTIFICATE BUTTON
-        =========================================== */}
+        {/* =========================================
+            4. GENERATE CERTIFICATE
+        ========================================= */}
 
         {completedInspection && (
           <section className="inspection-section">
+
             <h3>
               4. Generate Digital Certificate
             </h3>
 
             <div className="application-details">
+
               <div>
                 <span>
                   Application Number
@@ -940,6 +956,7 @@ function Inspection() {
                   Inspection Completed
                 </strong>
               </div>
+
             </div>
 
             <div
@@ -955,8 +972,8 @@ function Inspection() {
               </strong>
 
               <p>
-                Review the inspection result, then
-                click the button below to officially
+                The inspection is complete.
+                Click below to officially
                 generate the digital certificate.
               </p>
             </div>
@@ -964,8 +981,12 @@ function Inspection() {
             <button
               type="button"
               className="inspection-submit"
-              onClick={handleGenerateCertificate}
-              disabled={generatingCertificate}
+              onClick={
+                handleGenerateCertificate
+              }
+              disabled={
+                generatingCertificate
+              }
               style={{
                 marginTop: "20px",
               }}
@@ -974,12 +995,13 @@ function Inspection() {
                 ? "Generating Certificate..."
                 : "📜 Generate Certificate"}
             </button>
+
           </section>
         )}
+
       </main>
     </div>
   );
 }
 
 export default Inspection;
-
