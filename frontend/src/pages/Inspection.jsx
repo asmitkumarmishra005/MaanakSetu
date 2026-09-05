@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_URL from "../api";
@@ -140,6 +141,8 @@ function Inspection() {
       ...previous,
       [name]: value,
     }));
+
+    setMessage("");
   }
 
   function selectApplication(application) {
@@ -196,6 +199,7 @@ function Inspection() {
       return;
     }
 
+    // Parse measured values
     let measuredValues = {};
 
     if (formData.measuredValues.trim() !== "") {
@@ -215,9 +219,9 @@ function Inspection() {
     setMessage("");
 
     try {
-      // =========================================
-      // STEP 1: SUBMIT INSPECTION
-      // =========================================
+      // =====================================================
+      // STEP 1 — SUBMIT INSPECTION
+      // =====================================================
 
       const inspectionResponse = await fetch(
         `${API_URL}/inspections`,
@@ -270,46 +274,25 @@ function Inspection() {
         );
       }
 
-      // Try all common response structures
+      // Get the newly-created inspection ID
       const inspectionId =
-  inspectionData?.inspection?.id ||
-  inspectionData?.inspectionId ||
-  inspectionData?.id;
+        inspectionData?.inspection?.id ||
+        inspectionData?.inspectionId ||
+        inspectionData?.id;
 
-if (!inspectionId) {
-  throw new Error(
-    "Inspection was saved, but the backend did not return an inspection ID."
-  );
-}
+      if (!inspectionId) {
+        throw new Error(
+          "Inspection was saved, but the server did not return an inspection ID."
+        );
+      }
 
-if (formData.result.toLowerCase() === "pass") {
-  const certificateResponse = await fetch(
-    `${API_URL}/certificates/generate/${inspectionId}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+      // =====================================================
+      // STEP 2 — AUTOMATIC CERTIFICATE GENERATION
+      // =====================================================
 
-  const certificateData =
-    await certificateResponse.json();
-
-  if (!certificateResponse.ok) {
-    throw new Error(
-      certificateData.message ||
-        "Inspection completed, but certificate generation failed."
-    );
-  }
-
-  setMessage(
-    `Inspection passed and certificate generated successfully! ✅ Certificate: ${
-      certificateData?.certificate?.certificate_number || "Generated"
-    }`
-  );
-}
+      if (
+        formData.result.toLowerCase() === "pass"
+      ) {
         const certificateResponse =
           await fetch(
             `${API_URL}/certificates/generate/${inspectionId}`,
@@ -327,13 +310,10 @@ if (formData.result.toLowerCase() === "pass") {
         const certificateData =
           await certificateResponse.json();
 
-        if (
-          certificateResponse.status === 401
-        ) {
+        if (certificateResponse.status === 401) {
           localStorage.removeItem(
             "maanaksetu_token"
           );
-
           localStorage.removeItem(
             "maanaksetu_user"
           );
@@ -350,18 +330,16 @@ if (formData.result.toLowerCase() === "pass") {
         }
 
         const certificate =
-          certificateData?.certificate ||
-          null;
+          certificateData?.certificate;
 
         const certificateNumber =
           certificate?.certificate_number ||
           "Generated successfully";
 
         const verificationUrl =
-          certificateData?.verificationUrl ||
-          "";
+          certificateData?.verificationUrl || "";
 
-        // Application becomes verified
+        // Update application status in UI
         setApplications((previous) =>
           previous.map((application) =>
             application.id ===
@@ -375,26 +353,25 @@ if (formData.result.toLowerCase() === "pass") {
         );
 
         setMessage(
-          verificationUrl
-            ? `Inspection passed and certificate generated successfully! ✅ Certificate: ${certificateNumber}`
-            : `Inspection passed and certificate generated successfully! ✅ Certificate: ${certificateNumber}`
+          `✅ Inspection passed and certificate generated successfully! Certificate: ${certificateNumber}`
         );
 
+        // Useful for debugging
         console.log(
-          "Certificate generated:",
+          "Certificate generated successfully:",
           certificateData
         );
 
         if (verificationUrl) {
           console.log(
-            "Verification URL:",
+            "Certificate verification URL:",
             verificationUrl
           );
         }
       } else {
-        // =========================================
-        // FAIL RESULT — NO CERTIFICATE
-        // =========================================
+        // =====================================================
+        // FAIL — DO NOT GENERATE CERTIFICATE
+        // =====================================================
 
         setApplications((previous) =>
           previous.map((application) =>
@@ -410,13 +387,13 @@ if (formData.result.toLowerCase() === "pass") {
         );
 
         setMessage(
-          "Inspection completed successfully. Result: FAIL ❌"
+          "❌ Inspection completed successfully. Result: FAIL"
         );
       }
 
-      // =========================================
-      // RESET FORM
-      // =========================================
+      // =====================================================
+      // STEP 3 — RESET FORM
+      // =====================================================
 
       setSelectedApplication(null);
 
@@ -508,7 +485,8 @@ if (formData.result.toLowerCase() === "pass") {
           <div
             className={
               message.includes("successfully") ||
-              message.includes("generated")
+              message.includes("generated") ||
+              message.includes("Certificate:")
                 ? "inspection-message success"
                 : "inspection-message error"
             }
@@ -517,9 +495,9 @@ if (formData.result.toLowerCase() === "pass") {
           </div>
         )}
 
-        {/* =========================================
-            SELECT APPLICATION
-        ========================================= */}
+        {/* =====================================================
+            1. SELECT APPLICATION
+        ===================================================== */}
 
         <section className="inspection-section">
           <h3>1. Select Application</h3>
@@ -598,9 +576,9 @@ if (formData.result.toLowerCase() === "pass") {
           )}
         </section>
 
-        {/* =========================================
-            APPLICATION DETAILS
-        ========================================= */}
+        {/* =====================================================
+            2. APPLICATION DETAILS
+        ===================================================== */}
 
         {selectedApplication && (
           <section className="inspection-section">
@@ -720,9 +698,9 @@ if (formData.result.toLowerCase() === "pass") {
           </section>
         )}
 
-        {/* =========================================
-            INSPECTION FORM
-        ========================================= */}
+        {/* =====================================================
+            3. INSPECTION FORM
+        ===================================================== */}
 
         {selectedApplication && (
           <form
@@ -808,3 +786,4 @@ if (formData.result.toLowerCase() === "pass") {
 }
 
 export default Inspection;
+
