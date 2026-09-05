@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import API_URL from "../api";
@@ -19,6 +20,15 @@ function CertificateDetails() {
     const savedUser = localStorage.getItem("maanaksetu_user");
 
     if (!token || !savedUser) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      JSON.parse(savedUser);
+    } catch {
+      localStorage.removeItem("maanaksetu_token");
+      localStorage.removeItem("maanaksetu_user");
       navigate("/login");
       return;
     }
@@ -49,11 +59,19 @@ function CertificateDetails() {
         );
       }
 
-      setCertificate(data.certificate || data);
+      const loadedCertificate =
+        data.certificate || data;
+
+      setCertificate(loadedCertificate);
     } catch (error) {
-      console.error("Certificate loading error:", error);
+      console.error(
+        "Certificate loading error:",
+        error
+      );
+
       setMessage(
-        error.message || "Unable to load certificate."
+        error.message ||
+          "Unable to load certificate."
       );
     } finally {
       setLoading(false);
@@ -61,7 +79,9 @@ function CertificateDetails() {
   };
 
   const formatDate = (date) => {
-    if (!date) return "N/A";
+    if (!date) {
+      return "N/A";
+    }
 
     const parsedDate = new Date(date);
 
@@ -76,23 +96,116 @@ function CertificateDetails() {
     });
   };
 
+  const getVerificationCode = () => {
+    return (
+      certificate?.verification_code ||
+      certificate?.verificationCode ||
+      certificate?.verification_code_value ||
+      ""
+    );
+  };
+
+  const getVerificationUrl = () => {
+    const verificationCode =
+      getVerificationCode();
+
+    if (!verificationCode) {
+      return "";
+    }
+
+    return `${window.location.origin}${window.location.pathname}#/verify/${encodeURIComponent(
+      verificationCode
+    )}`;
+  };
+
+  /*
+   * If the backend already returns qrCode, use it.
+   * Otherwise generate a QR image from the verification URL.
+   */
+  const getQrSource = () => {
+    if (
+      certificate?.qrCode
+    ) {
+      return certificate.qrCode;
+    }
+
+    if (
+      certificate?.qr_code
+    ) {
+      return certificate.qr_code;
+    }
+
+    const verificationUrl =
+      getVerificationUrl();
+
+    if (!verificationUrl) {
+      return "";
+    }
+
+    return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
+      verificationUrl
+    )}`;
+  };
+
   const handlePrint = () => {
     window.print();
   };
 
+  const handleVerify = () => {
+    const verificationUrl =
+      getVerificationUrl();
+
+    if (!verificationUrl) {
+      setMessage(
+        "Verification code is unavailable."
+      );
+      return;
+    }
+
+    window.open(
+      verificationUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
   if (loading) {
     return (
-      <div style={{ padding: "40px", textAlign: "center" }}>
-        <h2>Loading Certificate...</h2>
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: "40px",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <h2>Loading Certificate...</h2>
+          <p>
+            Fetching your digital certificate.
+          </p>
+        </div>
       </div>
     );
   }
 
   if (!certificate) {
     return (
-      <div style={{ padding: "40px", textAlign: "center" }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          padding: "40px",
+          textAlign: "center",
+          background: "#f4f7fb",
+        }}
+      >
         <h2>Certificate Not Found</h2>
-        <p>{message}</p>
+
+        <p>
+          {message ||
+            "The requested certificate could not be found."}
+        </p>
 
         <Link to="/certificates">
           ← Back to Certificates
@@ -100,6 +213,19 @@ function CertificateDetails() {
       </div>
     );
   }
+
+  const qrSource = getQrSource();
+  const verificationCode =
+    getVerificationCode();
+
+  const status =
+    certificate.status === "revoked"
+      ? "REVOKED"
+      : certificate.valid_until &&
+        new Date(certificate.valid_until) <
+          new Date()
+      ? "EXPIRED"
+      : "VALID";
 
   return (
     <div
@@ -116,31 +242,63 @@ function CertificateDetails() {
           background: "#ffffff",
           padding: "40px",
           borderRadius: "16px",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+          boxShadow:
+            "0 10px 30px rgba(0,0,0,0.08)",
         }}
       >
+        {/* Top navigation */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: "30px",
+            gap: "15px",
+            flexWrap: "wrap",
           }}
         >
           <Link to="/certificates">
             ← My Certificates
           </Link>
 
-          <button
-            type="button"
-            onClick={handlePrint}
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
           >
-            🖨 Print Certificate
-          </button>
+            {verificationCode && (
+              <button
+                type="button"
+                onClick={handleVerify}
+              >
+                🔍 Verify Online
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handlePrint}
+            >
+              🖨 Print Certificate
+            </button>
+          </div>
         </div>
 
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "42px" }}>⚖</div>
+        {/* Header */}
+        <div
+          style={{
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "46px",
+            }}
+          >
+            ⚖
+          </div>
 
           <h1>MaanakSetu</h1>
 
@@ -149,12 +307,14 @@ function CertificateDetails() {
           </h2>
 
           <p>
-            Legal Metrology Verification & Certification
+            Legal Metrology Verification &
+            Certification
           </p>
         </div>
 
         <hr />
 
+        {/* Certificate number and status */}
         <div
           style={{
             margin: "25px 0",
@@ -164,7 +324,8 @@ function CertificateDetails() {
           <p>Certificate Number</p>
 
           <h2>
-            {certificate.certificate_number || "N/A"}
+            {certificate.certificate_number ||
+              "N/A"}
           </h2>
 
           <strong
@@ -174,21 +335,20 @@ function CertificateDetails() {
               padding: "8px 18px",
               borderRadius: "20px",
               background:
-                certificate.status === "revoked"
-                  ? "#fdecec"
-                  : "#e8f7ee",
+                status === "VALID"
+                  ? "#e8f7ee"
+                  : "#fdecec",
               color:
-                certificate.status === "revoked"
-                  ? "#b42318"
-                  : "#16733c",
+                status === "VALID"
+                  ? "#16733c"
+                  : "#b42318",
             }}
           >
-            {certificate.status === "revoked"
-              ? "REVOKED"
-              : "VALID"}
+            {status}
           </strong>
         </div>
 
+        {/* Certificate details */}
         <div
           style={{
             display: "grid",
@@ -200,20 +360,25 @@ function CertificateDetails() {
         >
           <div>
             <strong>Instrument</strong>
+
             <p>
-              {certificate.instrument_type || "N/A"}
+              {certificate.instrument_type ||
+                "N/A"}
             </p>
           </div>
 
           <div>
             <strong>Manufacturer</strong>
+
             <p>
-              {certificate.manufacturer || "N/A"}
+              {certificate.manufacturer ||
+                "N/A"}
             </p>
           </div>
 
           <div>
             <strong>Model</strong>
+
             <p>
               {certificate.model ||
                 certificate.model_number ||
@@ -223,13 +388,16 @@ function CertificateDetails() {
 
           <div>
             <strong>Serial Number</strong>
+
             <p>
-              {certificate.serial_number || "N/A"}
+              {certificate.serial_number ||
+                "N/A"}
             </p>
           </div>
 
           <div>
             <strong>Issued On</strong>
+
             <p>
               {formatDate(
                 certificate.issued_at ||
@@ -240,50 +408,132 @@ function CertificateDetails() {
 
           <div>
             <strong>Valid Until</strong>
+
             <p>
-              {formatDate(certificate.valid_until)}
+              {formatDate(
+                certificate.valid_until
+              )}
             </p>
           </div>
         </div>
 
-        <hr />
+        <hr
+          style={{
+            margin: "35px 0",
+          }}
+        />
 
+        {/* QR verification */}
         <div
           style={{
             marginTop: "30px",
             textAlign: "center",
           }}
         >
-          <h3>Official Verification</h3>
+          <h3>
+            Official Verification
+          </h3>
 
-          {certificate.qr_code ||
-          certificate.qrCode ? (
-            <img
-              src={
-                certificate.qr_code ||
-                certificate.qrCode
-              }
-              alt="Certificate QR Code"
+          {qrSource ? (
+            <div
               style={{
-                width: "220px",
-                height: "220px",
-                marginTop: "15px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                marginTop: "20px",
               }}
-            />
-          ) : (
-            <p>QR code unavailable</p>
-          )}
+            >
+              <div
+                style={{
+                  padding: "14px",
+                  background: "#ffffff",
+                  border: "1px solid #ddd",
+                  borderRadius: "12px",
+                  display: "inline-block",
+                }}
+              >
+                <img
+                  src={qrSource}
+                  alt="Certificate Verification QR Code"
+                  width="240"
+                  height="240"
+                  style={{
+                    display: "block",
+                  }}
+                />
+              </div>
 
-          <p style={{ marginTop: "15px" }}>
-            Scan the QR code to verify this certificate.
+              <p
+                style={{
+                  marginTop: "18px",
+                  fontWeight: "600",
+                }}
+              >
+                Scan the QR code to verify
+                this certificate.
+              </p>
+
+              {verificationCode && (
+                <p>
+                  <strong>
+                    Verification Code:
+                  </strong>{" "}
+                  {verificationCode}
+                </p>
+              )}
+
+              {getVerificationUrl() && (
+                <p
+                  style={{
+                    fontSize: "13px",
+                    wordBreak: "break-all",
+                    color: "#666",
+                    maxWidth: "700px",
+                  }}
+                >
+                  {getVerificationUrl()}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: "20px",
+                borderRadius: "10px",
+                background: "#fff7e6",
+                color: "#8a5a00",
+                marginTop: "20px",
+              }}
+            >
+              <p>
+                QR code unavailable because
+                the certificate has no verification
+                code.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            marginTop: "40px",
+            paddingTop: "20px",
+            borderTop: "1px solid #ddd",
+            textAlign: "center",
+            color: "#666",
+            fontSize: "14px",
+          }}
+        >
+          <p>
+            This certificate is digitally issued
+            through MaanakSetu.
           </p>
 
-          {certificate.verification_code && (
-            <p>
-              <strong>Verification Code:</strong>{" "}
-              {certificate.verification_code}
-            </p>
-          )}
+          <p>
+            Verification should be performed using
+            the QR code or verification code above.
+          </p>
         </div>
       </div>
     </div>
@@ -291,3 +541,4 @@ function CertificateDetails() {
 }
 
 export default CertificateDetails;
+
