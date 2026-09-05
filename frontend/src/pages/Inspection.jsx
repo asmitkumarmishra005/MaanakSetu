@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_URL from "../api";
@@ -8,7 +7,9 @@ function Inspection() {
   const navigate = useNavigate();
 
   const [applications, setApplications] = useState([]);
-  const [selectedApplication, setSelectedApplication] = useState(null);
+  const [selectedApplication, setSelectedApplication] =
+    useState(null);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -49,18 +50,23 @@ function Inspection() {
       user.role !== "admin" &&
       user.role !== "gatc"
     ) {
-      setMessage("Only authorized officers can access inspections.");
+      setMessage(
+        "Only authorized officers can access inspections."
+      );
       setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(`${API_URL}/applications`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${API_URL}/applications`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       const data = await response.json();
 
@@ -77,7 +83,9 @@ function Inspection() {
         );
       }
 
-      const applicationList = Array.isArray(data.applications)
+      const applicationList = Array.isArray(
+        data.applications
+      )
         ? data.applications
         : [];
 
@@ -92,24 +100,33 @@ function Inspection() {
         );
 
         const params = new URLSearchParams(queryString);
-        const applicationId = params.get("applicationId");
+        const applicationId =
+          params.get("applicationId");
 
         if (applicationId) {
-          const foundApplication = applicationList.find(
-            (application) =>
-              String(application.id) === String(applicationId)
-          );
+          const foundApplication =
+            applicationList.find(
+              (application) =>
+                String(application.id) ===
+                String(applicationId)
+            );
 
           if (foundApplication) {
-            setSelectedApplication(foundApplication);
+            setSelectedApplication(
+              foundApplication
+            );
           }
         }
       }
     } catch (error) {
-      console.error("Applications loading error:", error);
+      console.error(
+        "Applications loading error:",
+        error
+      );
 
       setMessage(
-        error.message || "Unable to load applications."
+        error.message ||
+          "Unable to load applications."
       );
     } finally {
       setLoading(false);
@@ -134,12 +151,19 @@ function Inspection() {
     event.preventDefault();
 
     if (!selectedApplication) {
-      setMessage("Please select an application first.");
+      setMessage(
+        "Please select an application first."
+      );
       return;
     }
 
-    const token = localStorage.getItem("maanaksetu_token");
-    const savedUser = localStorage.getItem("maanaksetu_user");
+    const token = localStorage.getItem(
+      "maanaksetu_token"
+    );
+
+    const savedUser = localStorage.getItem(
+      "maanaksetu_user"
+    );
 
     if (!token || !savedUser) {
       navigate("/login");
@@ -151,8 +175,12 @@ function Inspection() {
     try {
       user = JSON.parse(savedUser);
     } catch {
-      localStorage.removeItem("maanaksetu_token");
-      localStorage.removeItem("maanaksetu_user");
+      localStorage.removeItem(
+        "maanaksetu_token"
+      );
+      localStorage.removeItem(
+        "maanaksetu_user"
+      );
       navigate("/login");
       return;
     }
@@ -162,7 +190,9 @@ function Inspection() {
       user.role !== "admin" &&
       user.role !== "gatc"
     ) {
-      setMessage("You are not authorized to submit inspections.");
+      setMessage(
+        "You are not authorized to submit inspections."
+      );
       return;
     }
 
@@ -170,10 +200,12 @@ function Inspection() {
 
     if (formData.measuredValues.trim() !== "") {
       try {
-        measuredValues = JSON.parse(formData.measuredValues);
+        measuredValues = JSON.parse(
+          formData.measuredValues
+        );
       } catch {
         setMessage(
-          'Measured Values must be valid JSON. Example: {"error":"0.02 kg","capacity":"30 kg"}'
+          'Measured Values must be valid JSON. Example: {"error":"0.02 kg","capacity":"30 kg","accuracy":"Within permissible limit"}'
         );
         return;
       }
@@ -183,52 +215,188 @@ function Inspection() {
     setMessage("");
 
     try {
-      const response = await fetch(`${API_URL}/inspections`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          applicationId: selectedApplication.id,
-          officerId: user.id,
-          inspectionDate: new Date().toISOString(),
-          observations: formData.observations,
-          measuredValues: measuredValues,
-          remarks: formData.remarks,
-          result: formData.result,
-        }),
-      });
+      // =========================================
+      // STEP 1: SUBMIT INSPECTION
+      // =========================================
 
-      const data = await response.json();
+      const inspectionResponse = await fetch(
+        `${API_URL}/inspections`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            applicationId:
+              selectedApplication.id,
 
-      if (response.status === 401) {
-        localStorage.removeItem("maanaksetu_token");
-        localStorage.removeItem("maanaksetu_user");
+            officerId: user.id,
+
+            inspectionDate:
+              new Date().toISOString(),
+
+            observations:
+              formData.observations,
+
+            measuredValues,
+
+            remarks: formData.remarks,
+
+            result: formData.result,
+          }),
+        }
+      );
+
+      const inspectionData =
+        await inspectionResponse.json();
+
+      if (inspectionResponse.status === 401) {
+        localStorage.removeItem(
+          "maanaksetu_token"
+        );
+        localStorage.removeItem(
+          "maanaksetu_user"
+        );
+
         navigate("/login");
         return;
       }
 
-      if (!response.ok) {
+      if (!inspectionResponse.ok) {
         throw new Error(
-          data.message || "Inspection submission failed"
+          inspectionData.message ||
+            "Inspection submission failed"
         );
       }
 
-      setMessage(
-        `Inspection completed successfully! Result: ${formData.result.toUpperCase()}`
-      );
+      // Try all common response structures
+      const inspectionId =
+        inspectionData?.inspection?.id ||
+        inspectionData?.inspectionId ||
+        inspectionData?.id;
 
-      setApplications((previous) =>
-        previous.map((application) =>
-          application.id === selectedApplication.id
-            ? {
-                ...application,
-                status: "inspection_completed",
-              }
-            : application
-        )
-      );
+      if (!inspectionId) {
+        throw new Error(
+          "Inspection was saved, but the backend did not return an inspection ID."
+        );
+      }
+
+      // =========================================
+      // STEP 2: GENERATE CERTIFICATE FOR PASS
+      // =========================================
+
+      if (
+        formData.result.toLowerCase() ===
+        "pass"
+      ) {
+        const certificateResponse =
+          await fetch(
+            `${API_URL}/certificates/generate/${inspectionId}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+        const certificateData =
+          await certificateResponse.json();
+
+        if (
+          certificateResponse.status === 401
+        ) {
+          localStorage.removeItem(
+            "maanaksetu_token"
+          );
+
+          localStorage.removeItem(
+            "maanaksetu_user"
+          );
+
+          navigate("/login");
+          return;
+        }
+
+        if (!certificateResponse.ok) {
+          throw new Error(
+            certificateData.message ||
+              "Inspection completed, but certificate generation failed."
+          );
+        }
+
+        const certificate =
+          certificateData?.certificate ||
+          null;
+
+        const certificateNumber =
+          certificate?.certificate_number ||
+          "Generated successfully";
+
+        const verificationUrl =
+          certificateData?.verificationUrl ||
+          "";
+
+        // Application becomes verified
+        setApplications((previous) =>
+          previous.map((application) =>
+            application.id ===
+            selectedApplication.id
+              ? {
+                  ...application,
+                  status: "verified",
+                }
+              : application
+          )
+        );
+
+        setMessage(
+          verificationUrl
+            ? `Inspection passed and certificate generated successfully! ✅ Certificate: ${certificateNumber}`
+            : `Inspection passed and certificate generated successfully! ✅ Certificate: ${certificateNumber}`
+        );
+
+        console.log(
+          "Certificate generated:",
+          certificateData
+        );
+
+        if (verificationUrl) {
+          console.log(
+            "Verification URL:",
+            verificationUrl
+          );
+        }
+      } else {
+        // =========================================
+        // FAIL RESULT — NO CERTIFICATE
+        // =========================================
+
+        setApplications((previous) =>
+          previous.map((application) =>
+            application.id ===
+            selectedApplication.id
+              ? {
+                  ...application,
+                  status:
+                    "inspection_completed",
+                }
+              : application
+          )
+        );
+
+        setMessage(
+          "Inspection completed successfully. Result: FAIL ❌"
+        );
+      }
+
+      // =========================================
+      // RESET FORM
+      // =========================================
 
       setSelectedApplication(null);
 
@@ -239,10 +407,14 @@ function Inspection() {
         result: "pass",
       });
     } catch (error) {
-      console.error("Inspection submission error:", error);
+      console.error(
+        "Inspection/certificate submission error:",
+        error
+      );
 
       setMessage(
-        error.message || "Inspection submission failed."
+        error.message ||
+          "Inspection submission failed."
       );
     } finally {
       setSubmitting(false);
@@ -270,7 +442,10 @@ function Inspection() {
       <div className="inspection-page">
         <div className="inspection-container">
           <h2>Loading Applications...</h2>
-          <p>Fetching verification applications.</p>
+
+          <p>
+            Fetching verification applications.
+          </p>
         </div>
       </div>
     );
@@ -281,7 +456,10 @@ function Inspection() {
       <header className="inspection-header">
         <div>
           <h1>⚖ MaanakSetu</h1>
-          <p>Officer Inspection Portal</p>
+
+          <p>
+            Officer Inspection Portal
+          </p>
         </div>
 
         <Link
@@ -300,8 +478,8 @@ function Inspection() {
             <h2>Instrument Inspection</h2>
 
             <p>
-              Verify the instrument and record official
-              inspection results.
+              Verify the instrument and record
+              official inspection results.
             </p>
           </div>
         </div>
@@ -309,7 +487,8 @@ function Inspection() {
         {message && (
           <div
             className={
-              message.includes("successfully")
+              message.includes("successfully") ||
+              message.includes("generated")
                 ? "inspection-message success"
                 : "inspection-message error"
             }
@@ -318,66 +497,90 @@ function Inspection() {
           </div>
         )}
 
+        {/* =========================================
+            SELECT APPLICATION
+        ========================================= */}
+
         <section className="inspection-section">
           <h3>1. Select Application</h3>
 
           {applications.length === 0 ? (
             <div className="empty-inspection">
-              <h3>No Verification Applications Found</h3>
+              <h3>
+                No Verification Applications Found
+              </h3>
 
               <p>
-                Submit a verification application from a
-                Business/User account first.
+                Submit a verification application
+                from a Business/User account first.
               </p>
             </div>
           ) : (
             <div className="application-list">
-              {applications.map((application) => (
-                <button
-                  type="button"
-                  key={application.id}
-                  className={
-                    selectedApplication &&
-                    selectedApplication.id === application.id
-                      ? "application-item selected"
-                      : "application-item"
-                  }
-                  onClick={() => selectApplication(application)}
-                >
-                  <div>
-                    <strong>
-                      {application.application_number}
-                    </strong>
+              {applications.map(
+                (application) => (
+                  <button
+                    type="button"
+                    key={application.id}
+                    className={
+                      selectedApplication &&
+                      selectedApplication.id ===
+                        application.id
+                        ? "application-item selected"
+                        : "application-item"
+                    }
+                    onClick={() =>
+                      selectApplication(
+                        application
+                      )
+                    }
+                  >
+                    <div>
+                      <strong>
+                        {
+                          application.application_number
+                        }
+                      </strong>
 
-                    <p>
-                      {application.instrument_type ||
-                        "Instrument"}
-                    </p>
+                      <p>
+                        {application.instrument_type ||
+                          "Instrument"}
+                      </p>
 
-                    <small>
-                      Applicant:{" "}
-                      {application.applicant_name ||
-                        "Applicant"}
-                    </small>
+                      <small>
+                        Applicant:{" "}
+                        {application.applicant_name ||
+                          "Applicant"}
+                      </small>
 
-                    <small>
-                      Serial:{" "}
-                      {application.serial_number || "N/A"}
-                    </small>
+                      <small>
+                        Serial:{" "}
+                        {application.serial_number ||
+                          "N/A"}
+                      </small>
 
-                    <small>
-                      {getLocation(application)}
-                    </small>
-                  </div>
+                      <small>
+                        {getLocation(
+                          application
+                        )}
+                      </small>
+                    </div>
 
-                  <span>
-                    {formatStatus(application.status)}
-                  </span>
-                </button>
-              ))}
+                    <span>
+                      {formatStatus(
+                        application.status
+                      )}
+                    </span>
+                  </button>
+                )
+              )}
             </div>
           )}
         </section>
+
+        {/* =========================================
+            APPLICATION DETAILS
+        ========================================= */}
 
         {selectedApplication && (
           <section className="inspection-section">
@@ -385,77 +588,121 @@ function Inspection() {
 
             <div className="application-details">
               <div>
-                <span>Application Number</span>
+                <span>
+                  Application Number
+                </span>
+
                 <strong>
-                  {selectedApplication.application_number}
+                  {
+                    selectedApplication.application_number
+                  }
                 </strong>
               </div>
 
               <div>
                 <span>Applicant</span>
+
                 <strong>
-                  {selectedApplication.applicant_name || "N/A"}
+                  {selectedApplication.applicant_name ||
+                    "N/A"}
                 </strong>
               </div>
 
               <div>
                 <span>Email</span>
+
                 <strong>
-                  {selectedApplication.applicant_email || "N/A"}
+                  {
+                    selectedApplication.applicant_email ||
+                    "N/A"
+                  }
                 </strong>
               </div>
 
               <div>
                 <span>Instrument</span>
+
                 <strong>
-                  {selectedApplication.instrument_type || "N/A"}
+                  {
+                    selectedApplication.instrument_type ||
+                    "N/A"
+                  }
                 </strong>
               </div>
 
               <div>
                 <span>Manufacturer</span>
+
                 <strong>
-                  {selectedApplication.manufacturer || "N/A"}
+                  {
+                    selectedApplication.manufacturer ||
+                    "N/A"
+                  }
                 </strong>
               </div>
 
               <div>
                 <span>Model Number</span>
+
                 <strong>
-                  {selectedApplication.model_number || "N/A"}
+                  {
+                    selectedApplication.model_number ||
+                    "N/A"
+                  }
                 </strong>
               </div>
 
               <div>
                 <span>Serial Number</span>
+
                 <strong>
-                  {selectedApplication.serial_number || "N/A"}
+                  {
+                    selectedApplication.serial_number ||
+                    "N/A"
+                  }
                 </strong>
               </div>
 
               <div>
-                <span>Verification Type</span>
+                <span>
+                  Verification Type
+                </span>
+
                 <strong>
-                  {selectedApplication.verification_type || "N/A"}
+                  {
+                    selectedApplication.verification_type ||
+                    "N/A"
+                  }
                 </strong>
               </div>
 
               <div>
                 <span>Location</span>
+
                 <strong>
-                  {getLocation(selectedApplication)}
+                  {getLocation(
+                    selectedApplication
+                  )}
                 </strong>
               </div>
 
               <div>
                 <span>Preferred Date</span>
+
                 <strong>
-                  {selectedApplication.preferred_date || "N/A"}
+                  {
+                    selectedApplication.preferred_date ||
+                    "N/A"
+                  }
                 </strong>
               </div>
             </div>
           </section>
         )}
+
+        {/* =========================================
+            INSPECTION FORM
+        ========================================= */}
 
         {selectedApplication && (
           <form
@@ -489,7 +736,8 @@ function Inspection() {
               />
 
               <small>
-                Enter measured values as valid JSON.
+                Enter measured values as valid
+                JSON.
               </small>
             </label>
 
@@ -529,7 +777,7 @@ function Inspection() {
               disabled={submitting}
             >
               {submitting
-                ? "Submitting Inspection..."
+                ? "Submitting & Generating Certificate..."
                 : "Submit Official Inspection →"}
             </button>
           </form>
@@ -537,8 +785,6 @@ function Inspection() {
       </main>
     </div>
   );
-
 }
 
 export default Inspection;
-
