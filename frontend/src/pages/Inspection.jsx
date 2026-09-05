@@ -13,7 +13,18 @@ function Inspection() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [generatingCertificate, setGeneratingCertificate] =
+    useState(false);
+
   const [message, setMessage] = useState("");
+
+  // Stores the completed PASS inspection waiting
+  // for officer confirmation to generate certificate.
+  const [completedInspection, setCompletedInspection] =
+    useState(null);
+
+  const [generatedCertificate, setGeneratedCertificate] =
+    useState(null);
 
   const [formData, setFormData] = useState({
     observations: "",
@@ -92,6 +103,8 @@ function Inspection() {
 
       setApplications(applicationList);
 
+      // Support direct opening with:
+      // /inspection?applicationId=...
       const hash = window.location.hash;
       const questionMarkIndex = hash.indexOf("?");
 
@@ -113,9 +126,7 @@ function Inspection() {
             );
 
           if (foundApplication) {
-            setSelectedApplication(
-              foundApplication
-            );
+            setSelectedApplication(foundApplication);
           }
         }
       }
@@ -147,6 +158,8 @@ function Inspection() {
 
   function selectApplication(application) {
     setSelectedApplication(application);
+    setCompletedInspection(null);
+    setGeneratedCertificate(null);
     setMessage("");
   }
 
@@ -154,9 +167,7 @@ function Inspection() {
     event.preventDefault();
 
     if (!selectedApplication) {
-      setMessage(
-        "Please select an application first."
-      );
+      setMessage("Please select an application first.");
       return;
     }
 
@@ -178,12 +189,8 @@ function Inspection() {
     try {
       user = JSON.parse(savedUser);
     } catch {
-      localStorage.removeItem(
-        "maanaksetu_token"
-      );
-      localStorage.removeItem(
-        "maanaksetu_user"
-      );
+      localStorage.removeItem("maanaksetu_token");
+      localStorage.removeItem("maanaksetu_user");
       navigate("/login");
       return;
     }
@@ -199,7 +206,6 @@ function Inspection() {
       return;
     }
 
-    // Parse measured values
     let measuredValues = {};
 
     if (formData.measuredValues.trim() !== "") {
@@ -219,11 +225,11 @@ function Inspection() {
     setMessage("");
 
     try {
-      // =====================================================
+      // ============================================
       // STEP 1 — SUBMIT INSPECTION
-      // =====================================================
+      // ============================================
 
-      const inspectionResponse = await fetch(
+      const response = await fetch(
         `${API_URL}/inspections`,
         {
           method: "POST",
@@ -232,146 +238,88 @@ function Inspection() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            applicationId:
-              selectedApplication.id,
-
+            applicationId: selectedApplication.id,
             officerId: user.id,
-
             inspectionDate:
               new Date().toISOString(),
-
             observations:
               formData.observations,
-
             measuredValues,
-
             remarks: formData.remarks,
-
             result: formData.result,
           }),
         }
       );
 
-      const inspectionData =
-        await inspectionResponse.json();
+      const data = await response.json();
 
-      if (inspectionResponse.status === 401) {
-        localStorage.removeItem(
-          "maanaksetu_token"
-        );
-        localStorage.removeItem(
-          "maanaksetu_user"
-        );
-
+      if (response.status === 401) {
+        localStorage.removeItem("maanaksetu_token");
+        localStorage.removeItem("maanaksetu_user");
         navigate("/login");
         return;
       }
 
-      if (!inspectionResponse.ok) {
+      if (!response.ok) {
         throw new Error(
-          inspectionData.message ||
+          data.message ||
             "Inspection submission failed"
         );
       }
 
-      // Get the newly-created inspection ID
+      // Get inspection ID returned by backend
       const inspectionId =
-        inspectionData?.inspection?.id ||
-        inspectionData?.inspectionId ||
-        inspectionData?.id;
+        data?.inspection?.id ||
+        data?.inspectionId ||
+        data?.id;
 
       if (!inspectionId) {
         throw new Error(
-          "Inspection was saved, but the server did not return an inspection ID."
+          "Inspection was saved, but the inspection ID was not returned."
         );
       }
 
-      // =====================================================
-      // STEP 2 — AUTOMATIC CERTIFICATE GENERATION
-      // =====================================================
+      const result =
+        formData.result.toLowerCase();
 
-      if (
-        formData.result.toLowerCase() === "pass"
-      ) {
-        const certificateResponse =
-          await fetch(
-            `${API_URL}/certificates/generate/${inspectionId}`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type":
-                  "application/json",
+      // ============================================
+      // PASS
+      // ============================================
 
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
+      if (result === "pass") {
+        setCompletedInspection({
+          id: inspectionId,
+          applicationId:
+            selectedApplication.id,
+          applicationNumber:
+            selectedApplication.application_number,
+        });
 
-        const certificateData =
-          await certificateResponse.json();
+        setMessage(
+          "✅ Inspection completed successfully. The instrument PASSED inspection. You can now generate the certificate."
+        );
 
-        if (certificateResponse.status === 401) {
-          localStorage.removeItem(
-            "maanaksetu_token"
-          );
-          localStorage.removeItem(
-            "maanaksetu_user"
-          );
-
-          navigate("/login");
-          return;
-        }
-
-        if (!certificateResponse.ok) {
-          throw new Error(
-            certificateData.message ||
-              "Inspection completed, but certificate generation failed."
-          );
-        }
-
-        const certificate =
-          certificateData?.certificate;
-
-        const certificateNumber =
-          certificate?.certificate_number ||
-          "Generated successfully";
-
-        const verificationUrl =
-          certificateData?.verificationUrl || "";
-
-        // Update application status in UI
+        // Update application status locally
         setApplications((previous) =>
           previous.map((application) =>
             application.id ===
             selectedApplication.id
               ? {
                   ...application,
-                  status: "verified",
+                  status:
+                    "inspection_completed",
                 }
               : application
           )
         );
+      }
 
-        setMessage(
-          `✅ Inspection passed and certificate generated successfully! Certificate: ${certificateNumber}`
-        );
+      // ============================================
+      // FAIL
+      // ============================================
 
-        // Useful for debugging
-        console.log(
-          "Certificate generated successfully:",
-          certificateData
-        );
-
-        if (verificationUrl) {
-          console.log(
-            "Certificate verification URL:",
-            verificationUrl
-          );
-        }
-      } else {
-        // =====================================================
-        // FAIL — DO NOT GENERATE CERTIFICATE
-        // =====================================================
+      else {
+        setCompletedInspection(null);
 
         setApplications((previous) =>
           previous.map((application) =>
@@ -387,25 +335,22 @@ function Inspection() {
         );
 
         setMessage(
-          "❌ Inspection completed successfully. Result: FAIL"
+          "❌ Inspection completed successfully. The instrument FAILED inspection, so no certificate can be generated."
         );
       }
 
-      // =====================================================
-      // STEP 3 — RESET FORM
-      // =====================================================
-
-      setSelectedApplication(null);
-
+      // Clear form after inspection
       setFormData({
         observations: "",
         measuredValues: "",
         remarks: "",
         result: "pass",
       });
+
+      setSelectedApplication(null);
     } catch (error) {
       console.error(
-        "Inspection/certificate submission error:",
+        "Inspection submission error:",
         error
       );
 
@@ -415,6 +360,114 @@ function Inspection() {
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // ==================================================
+  // GENERATE CERTIFICATE
+  // ==================================================
+
+  async function handleGenerateCertificate() {
+    if (!completedInspection?.id) {
+      setMessage(
+        "No completed PASS inspection is available."
+      );
+      return;
+    }
+
+    const token = localStorage.getItem(
+      "maanaksetu_token"
+    );
+
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    setGeneratingCertificate(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/certificates/generate/${completedInspection.id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem(
+          "maanaksetu_token"
+        );
+        localStorage.removeItem(
+          "maanaksetu_user"
+        );
+
+        navigate("/login");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Certificate generation failed."
+        );
+      }
+
+      const certificate =
+        data?.certificate || null;
+
+      setGeneratedCertificate(certificate);
+
+      setMessage(
+        `🎉 Certificate generated successfully! ${
+          certificate?.certificate_number
+            ? `Certificate No: ${certificate.certificate_number}`
+            : ""
+        }`
+      );
+
+      console.log(
+        "Certificate generated:",
+        data
+      );
+
+      // Update application status in local UI
+      if (completedInspection.applicationId) {
+        setApplications((previous) =>
+          previous.map((application) =>
+            application.id ===
+            completedInspection.applicationId
+              ? {
+                  ...application,
+                  status: "verified",
+                }
+              : application
+          )
+        );
+      }
+
+      // Certificate generated, so disable
+      // the Generate Certificate button.
+      setCompletedInspection(null);
+    } catch (error) {
+      console.error(
+        "Certificate generation error:",
+        error
+      );
+
+      setMessage(
+        error.message ||
+          "Failed to generate certificate."
+      );
+    } finally {
+      setGeneratingCertificate(false);
     }
   }
 
@@ -484,9 +537,8 @@ function Inspection() {
         {message && (
           <div
             className={
-              message.includes("successfully") ||
-              message.includes("generated") ||
-              message.includes("Certificate:")
+              message.includes("✅") ||
+              message.includes("🎉")
                 ? "inspection-message success"
                 : "inspection-message error"
             }
@@ -495,9 +547,75 @@ function Inspection() {
           </div>
         )}
 
-        {/* =====================================================
-            1. SELECT APPLICATION
-        ===================================================== */}
+        {/* ===========================================
+            CERTIFICATE GENERATION RESULT
+        =========================================== */}
+
+        {generatedCertificate && (
+          <section className="inspection-section">
+            <h3>🎉 Certificate Generated</h3>
+
+            <div className="application-details">
+              <div>
+                <span>
+                  Certificate Number
+                </span>
+
+                <strong>
+                  {
+                    generatedCertificate.certificate_number ||
+                    "N/A"
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span>Status</span>
+
+                <strong>Verified</strong>
+              </div>
+
+              {generatedCertificate.verification_code && (
+                <div>
+                  <span>
+                    Verification Code
+                  </span>
+
+                  <strong>
+                    {
+                      generatedCertificate.verification_code
+                    }
+                  </strong>
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                marginTop: "20px",
+                display: "flex",
+                gap: "12px",
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                type="button"
+                className="inspection-submit"
+                onClick={() =>
+                  navigate(
+                    `/certificates/${generatedCertificate.id}`
+                  )
+                }
+              >
+                📜 View Certificate
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* ===========================================
+            APPLICATION LIST
+        =========================================== */}
 
         <section className="inspection-section">
           <h3>1. Select Application</h3>
@@ -576,9 +694,9 @@ function Inspection() {
           )}
         </section>
 
-        {/* =====================================================
-            2. APPLICATION DETAILS
-        ===================================================== */}
+        {/* ===========================================
+            APPLICATION DETAILS
+        =========================================== */}
 
         {selectedApplication && (
           <section className="inspection-section">
@@ -698,9 +816,9 @@ function Inspection() {
           </section>
         )}
 
-        {/* =====================================================
-            3. INSPECTION FORM
-        ===================================================== */}
+        {/* ===========================================
+            INSPECTION FORM
+        =========================================== */}
 
         {selectedApplication && (
           <form
@@ -775,10 +893,88 @@ function Inspection() {
               disabled={submitting}
             >
               {submitting
-                ? "Submitting & Generating Certificate..."
+                ? "Submitting Inspection..."
                 : "Submit Official Inspection →"}
             </button>
           </form>
+        )}
+
+        {/* ===========================================
+            GENERATE CERTIFICATE BUTTON
+        =========================================== */}
+
+        {completedInspection && (
+          <section className="inspection-section">
+            <h3>
+              4. Generate Digital Certificate
+            </h3>
+
+            <div className="application-details">
+              <div>
+                <span>
+                  Application Number
+                </span>
+
+                <strong>
+                  {
+                    completedInspection.applicationNumber ||
+                    "N/A"
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Inspection Result
+                </span>
+
+                <strong>
+                  ✅ PASS
+                </strong>
+              </div>
+
+              <div>
+                <span>Status</span>
+
+                <strong>
+                  Inspection Completed
+                </strong>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: "20px",
+                padding: "16px",
+                borderRadius: "10px",
+                background: "#e8f7ee",
+              }}
+            >
+              <strong>
+                The instrument passed inspection.
+              </strong>
+
+              <p>
+                Review the inspection result, then
+                click the button below to officially
+                generate the digital certificate.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="inspection-submit"
+              onClick={handleGenerateCertificate}
+              disabled={generatingCertificate}
+              style={{
+                marginTop: "20px",
+              }}
+            >
+              {generatingCertificate
+                ? "Generating Certificate..."
+                : "📜 Generate Certificate"}
+            </button>
+          </section>
         )}
       </main>
     </div>
